@@ -154,5 +154,84 @@ describe('CubeState', () => {
     it('throws for a move that is not implemented yet', () => {
       expect(() => solvedState().applyMove('R')).toThrow('Move R is not implemented');
     });
+
+    describe('D moves', () => {
+      it('applies the exact D permutation and changes the solved state', () => {
+        const moved = solvedState().applyMove('D');
+
+        expect(moved.isSolved()).toBe(false);
+        expect(moved.cornerPermutation).toEqual([0, 1, 2, 3, 5, 6, 7, 4]);
+        expect(moved.edgePermutation).toEqual([0, 1, 2, 3, 5, 6, 7, 4, 8, 9, 10, 11]);
+      });
+
+      it('does not mutate the original state', () => {
+        const state = solvedState();
+        const moved = state.applyMove('D');
+
+        expect(moved).not.toBe(state);
+        expect(state.isSolved()).toBe(true);
+      });
+
+      it('returns to identity after four D moves', () => {
+        const state = solvedState();
+        const moved = state.applyMove('D').applyMove('D').applyMove('D').applyMove('D');
+
+        expect(moved.equals(state)).toBe(true);
+      });
+
+      it("returns to identity after D followed by D'", () => {
+        const state = solvedState();
+
+        expect(state.applyMove('D').applyMove("D'").equals(state)).toBe(true);
+      });
+
+      it("returns to identity after D' followed by D", () => {
+        const state = solvedState();
+
+        expect(state.applyMove("D'").applyMove('D').equals(state)).toBe(true);
+      });
+
+      it('returns to identity after two D2 moves', () => {
+        const state = solvedState();
+
+        expect(state.applyMove('D2').applyMove('D2').equals(state)).toBe(true);
+      });
+
+      it('applies D2 like two D moves', () => {
+        const state = solvedState();
+
+        expect(state.applyMove('D2').equals(state.applyMove('D').applyMove('D'))).toBe(true);
+      });
+
+      it("applies D' like three D moves", () => {
+        const state = solvedState();
+        const threeQuarterTurns = state.applyMove('D').applyMove('D').applyMove('D');
+
+        expect(state.applyMove("D'").equals(threeQuarterTurns)).toBe(true);
+      });
+
+      it('does not change orientations', () => {
+        const state = solvedState();
+        const moved = state.applyMove('D');
+
+        expect(moved.cornerOrientation).toEqual(state.cornerOrientation);
+        expect(moved.edgeOrientation).toEqual(state.edgeOrientation);
+      });
+
+      it('does not change U-layer cubies', () => {
+        const state = solvedState();
+        const moved = state.applyMove('D');
+
+        expect(moved.cornerPermutation.slice(0, 4)).toEqual(state.cornerPermutation.slice(0, 4));
+        expect(moved.edgePermutation.slice(0, 4)).toEqual(state.edgePermutation.slice(0, 4));
+      });
+
+      it('does not change middle-layer edges', () => {
+        const state = solvedState();
+        const moved = state.applyMove('D');
+
+        expect(moved.edgePermutation.slice(8)).toEqual(state.edgePermutation.slice(8));
+      });
+    });
   });
 });

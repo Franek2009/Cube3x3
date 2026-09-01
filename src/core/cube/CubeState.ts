@@ -83,6 +83,15 @@ export class CubeState {
       case 'U2':
         quarterTurns = 2;
         break;
+      case 'D':
+        quarterTurns = 1;
+        break;
+      case "D'":
+        quarterTurns = 3;
+        break;
+      case 'D2':
+        quarterTurns = 2;
+        break;
       default:
         throw new Error(`Move ${move} is not implemented`);
     }
@@ -90,7 +99,7 @@ export class CubeState {
     let result: CubeState = this;
 
     for (let turn = 0; turn < quarterTurns; turn += 1) {
-      result = result.#applyUQuarterTurn();
+      result = move[0] === 'U' ? result.#applyUQuarterTurn() : result.#applyDQuarterTurn();
     }
 
     return result;
@@ -109,6 +118,28 @@ export class CubeState {
     edgePermutation[1] = this.#edgePermutation[0];
     edgePermutation[2] = this.#edgePermutation[1];
     edgePermutation[3] = this.#edgePermutation[2];
+
+    return new CubeState(
+      cornerPermutation,
+      this.#cornerOrientation,
+      edgePermutation,
+      this.#edgeOrientation
+    );
+  }
+
+  #applyDQuarterTurn(): CubeState {
+    const cornerPermutation = [...this.#cornerPermutation];
+    const edgePermutation = [...this.#edgePermutation];
+
+    cornerPermutation[4] = this.#cornerPermutation[5];
+    cornerPermutation[5] = this.#cornerPermutation[6];
+    cornerPermutation[6] = this.#cornerPermutation[7];
+    cornerPermutation[7] = this.#cornerPermutation[4];
+
+    edgePermutation[4] = this.#edgePermutation[5];
+    edgePermutation[5] = this.#edgePermutation[6];
+    edgePermutation[6] = this.#edgePermutation[7];
+    edgePermutation[7] = this.#edgePermutation[4];
 
     return new CubeState(
       cornerPermutation,
