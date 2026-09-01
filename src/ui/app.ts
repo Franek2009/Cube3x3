@@ -1,6 +1,7 @@
 import { ALL_MOVES, type Move } from '../core/moves/moves.ts';
 import { generateScramble } from '../core/scramble/scrambler.ts';
 import { CubeSession } from '../core/session/CubeSession.ts';
+import { CubeRenderer } from '../renderer/CubeRenderer.ts';
 import { installKeyboardControls } from './keyboard.ts';
 
 function getRequiredElement<T extends HTMLElement>(id: string): T {
@@ -23,12 +24,15 @@ export function initializeApp(): void {
   const controlsElement = getRequiredElement<HTMLDivElement>('move-controls');
   const newScrambleButton = getRequiredElement<HTMLButtonElement>('new-scramble');
   const resetButton = getRequiredElement<HTMLButtonElement>('reset-cube');
+  const rendererContainer = getRequiredElement<HTMLDivElement>('cube-viewport');
+  const cubeRenderer = new CubeRenderer(rendererContainer);
   let currentScramble: Move[] = [];
 
   const render = (): void => {
     const state = session.getState();
     const history = session.getMoveHistory();
 
+    cubeRenderer.renderState(state);
     scrambleElement.textContent = currentScramble.length > 0
       ? currentScramble.join(' ')
       : 'No scramble applied';

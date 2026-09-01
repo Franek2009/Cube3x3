@@ -10,8 +10,19 @@
       <header class="app-header">
         <p class="eyebrow">Cube Engine playground</p>
         <h1>Cube3x3</h1>
-        <p>Manual controls and a technical state preview before the 3D renderer arrives.</p>
+        <p>Interactive cube controls with a live 3D view and technical state preview.</p>
       </header>
+
+      <section class="panel cube-panel" aria-labelledby="cube-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Live state</p>
+            <h2 id="cube-heading">3D cube</h2>
+          </div>
+          <p class="keyboard-hint">Static renderer · moves update instantly</p>
+        </div>
+        <div id="cube-viewport" class="cube-viewport"></div>
+      </section>
 
       <section class="panel scramble-panel" aria-labelledby="scramble-heading">
         <div class="section-heading">
