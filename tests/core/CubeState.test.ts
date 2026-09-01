@@ -152,6 +152,43 @@ describe('CubeState', () => {
       expect(moved.isSolved()).toBe(false);
     });
 
+    it('moves existing corner and edge orientations with U-layer cubies', () => {
+      const state = new CubeState(
+        [0, 1, 2, 3, 4, 5, 6, 7],
+        [0, 1, 2, 0, 0, 0, 0, 0],
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      );
+      const moved = state.applyMove('U');
+
+      expect(moved.cornerOrientation).toEqual([0, 0, 1, 2, 0, 0, 0, 0]);
+      expect(moved.edgeOrientation).toEqual([0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
+    });
+
+    it('restores a state with non-zero orientations after four U moves', () => {
+      const state = new CubeState(
+        [0, 1, 2, 3, 4, 5, 6, 7],
+        [0, 1, 2, 0, 0, 0, 0, 0],
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      );
+      const moved = state.applyMove('U').applyMove('U').applyMove('U').applyMove('U');
+
+      expect(moved.equals(state)).toBe(true);
+    });
+
+    it('moves R corner orientations with cubies during a following U move', () => {
+      const moved = solvedState().applyMove('R').applyMove('U');
+
+      expect(moved.cornerOrientation).toEqual([1, 2, 0, 0, 1, 0, 0, 2]);
+    });
+
+    it('moves F edge orientations with cubies during a following U move', () => {
+      const moved = solvedState().applyMove('F').applyMove('U');
+
+      expect(moved.edgeOrientation).toEqual([0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0]);
+    });
+
     it.each(ALL_MOVES)('supports move %s', (move) => {
       expect(() => solvedState().applyMove(move)).not.toThrow();
     });
@@ -232,6 +269,31 @@ describe('CubeState', () => {
         const moved = state.applyMove('D');
 
         expect(moved.edgePermutation.slice(8)).toEqual(state.edgePermutation.slice(8));
+      });
+
+      it('moves existing corner and edge orientations with D-layer cubies', () => {
+        const state = new CubeState(
+          [0, 1, 2, 3, 4, 5, 6, 7],
+          [0, 0, 0, 0, 1, 2, 0, 0],
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+          [0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0]
+        );
+        const moved = state.applyMove('D');
+
+        expect(moved.cornerOrientation).toEqual([0, 0, 0, 0, 2, 0, 0, 1]);
+        expect(moved.edgeOrientation).toEqual([0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0]);
+      });
+
+      it('restores a state with non-zero orientations after four D moves', () => {
+        const state = new CubeState(
+          [0, 1, 2, 3, 4, 5, 6, 7],
+          [0, 0, 0, 0, 1, 2, 0, 0],
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+          [0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0]
+        );
+        const moved = state.applyMove('D').applyMove('D').applyMove('D').applyMove('D');
+
+        expect(moved.equals(state)).toBe(true);
       });
     });
 
