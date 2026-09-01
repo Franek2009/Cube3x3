@@ -21,6 +21,12 @@ export const ALL_MOVES = [
 
 export type Move = (typeof ALL_MOVES)[number];
 
+const MOVE_SET: ReadonlySet<string> = new Set(ALL_MOVES);
+
+export function isMove(value: string): value is Move {
+  return MOVE_SET.has(value);
+}
+
 const INVERSE_MOVES: Record<Move, Move> = {
   U: "U'",
   "U'": 'U',
