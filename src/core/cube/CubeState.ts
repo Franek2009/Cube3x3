@@ -1,3 +1,5 @@
+import type { Move } from '../moves/moves.ts';
+
 const SOLVED_CORNER_PERMUTATION = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 const SOLVED_CORNER_ORIENTATION = [0, 0, 0, 0, 0, 0, 0, 0] as const;
 const SOLVED_EDGE_PERMUTATION = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
@@ -64,6 +66,54 @@ export class CubeState {
       this.#cornerPermutation,
       this.#cornerOrientation,
       this.#edgePermutation,
+      this.#edgeOrientation
+    );
+  }
+
+  applyMove(move: Move): CubeState {
+    let quarterTurns: number;
+
+    switch (move) {
+      case 'U':
+        quarterTurns = 1;
+        break;
+      case "U'":
+        quarterTurns = 3;
+        break;
+      case 'U2':
+        quarterTurns = 2;
+        break;
+      default:
+        throw new Error(`Move ${move} is not implemented`);
+    }
+
+    let result: CubeState = this;
+
+    for (let turn = 0; turn < quarterTurns; turn += 1) {
+      result = result.#applyUQuarterTurn();
+    }
+
+    return result;
+  }
+
+  #applyUQuarterTurn(): CubeState {
+    const cornerPermutation = [...this.#cornerPermutation];
+    const edgePermutation = [...this.#edgePermutation];
+
+    cornerPermutation[0] = this.#cornerPermutation[3];
+    cornerPermutation[1] = this.#cornerPermutation[0];
+    cornerPermutation[2] = this.#cornerPermutation[1];
+    cornerPermutation[3] = this.#cornerPermutation[2];
+
+    edgePermutation[0] = this.#edgePermutation[3];
+    edgePermutation[1] = this.#edgePermutation[0];
+    edgePermutation[2] = this.#edgePermutation[1];
+    edgePermutation[3] = this.#edgePermutation[2];
+
+    return new CubeState(
+      cornerPermutation,
+      this.#cornerOrientation,
+      edgePermutation,
       this.#edgeOrientation
     );
   }
