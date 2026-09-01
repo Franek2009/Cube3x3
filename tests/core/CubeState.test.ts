@@ -339,5 +339,111 @@ describe('CubeState', () => {
         expect(moved.equals(state)).toBe(true);
       });
     });
+
+    describe('L moves', () => {
+      it('applies the exact L transformation and changes the solved state', () => {
+        const moved = solvedState().applyMove('L');
+
+        expect(moved.isSolved()).toBe(false);
+        expect(moved.cornerPermutation).toEqual([0, 2, 6, 3, 4, 1, 5, 7]);
+        expect(moved.cornerOrientation).toEqual([0, 1, 2, 0, 0, 2, 1, 0]);
+        expect(moved.edgePermutation).toEqual([0, 1, 10, 3, 4, 5, 9, 7, 8, 2, 6, 11]);
+        expect(moved.edgeOrientation).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      });
+
+      it('does not mutate the original state', () => {
+        const state = solvedState();
+        const moved = state.applyMove('L');
+
+        expect(moved).not.toBe(state);
+        expect(state.isSolved()).toBe(true);
+      });
+
+      it('returns to identity after four L moves', () => {
+        const state = solvedState();
+        const moved = state.applyMove('L').applyMove('L').applyMove('L').applyMove('L');
+
+        expect(moved.equals(state)).toBe(true);
+      });
+
+      it("returns to identity after L followed by L'", () => {
+        const state = solvedState();
+
+        expect(state.applyMove('L').applyMove("L'").equals(state)).toBe(true);
+      });
+
+      it("returns to identity after L' followed by L", () => {
+        const state = solvedState();
+
+        expect(state.applyMove("L'").applyMove('L').equals(state)).toBe(true);
+      });
+
+      it('returns to identity after two L2 moves', () => {
+        const state = solvedState();
+
+        expect(state.applyMove('L2').applyMove('L2').equals(state)).toBe(true);
+      });
+
+      it('applies L2 like two L moves', () => {
+        const state = solvedState();
+
+        expect(state.applyMove('L2').equals(state.applyMove('L').applyMove('L'))).toBe(true);
+      });
+
+      it("applies L' like three L moves", () => {
+        const state = solvedState();
+        const threeQuarterTurns = state.applyMove('L').applyMove('L').applyMove('L');
+
+        expect(state.applyMove("L'").equals(threeQuarterTurns)).toBe(true);
+      });
+
+      it('keeps the corner orientation sum divisible by three', () => {
+        const orientationSum = solvedState()
+          .applyMove('L')
+          .cornerOrientation.reduce((sum, orientation) => sum + orientation, 0);
+
+        expect(orientationSum % 3).toBe(0);
+      });
+
+      it('does not change cubies outside the L layer', () => {
+        const state = solvedState();
+        const moved = state.applyMove('L');
+
+        for (const index of [0, 3, 4, 7]) {
+          expect(moved.cornerPermutation[index]).toBe(state.cornerPermutation[index]);
+          expect(moved.cornerOrientation[index]).toBe(state.cornerOrientation[index]);
+        }
+
+        for (const index of [0, 1, 3, 4, 5, 7, 8, 11]) {
+          expect(moved.edgePermutation[index]).toBe(state.edgePermutation[index]);
+          expect(moved.edgeOrientation[index]).toBe(state.edgeOrientation[index]);
+        }
+      });
+
+      it('moves existing orientations and adds L deltas modulo three', () => {
+        const state = new CubeState(
+          [0, 1, 2, 3, 4, 5, 6, 7],
+          [0, 1, 0, 0, 0, 2, 0, 0],
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+          [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0]
+        );
+        const moved = state.applyMove('L');
+
+        expect(moved.cornerOrientation).toEqual([0, 1, 2, 0, 0, 0, 0, 0]);
+        expect(moved.edgeOrientation).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0]);
+      });
+
+      it('restores a state with non-zero orientations after four L moves', () => {
+        const state = new CubeState(
+          [0, 1, 2, 3, 4, 5, 6, 7],
+          [0, 1, 0, 0, 0, 2, 0, 0],
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+          [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0]
+        );
+        const moved = state.applyMove('L').applyMove('L').applyMove('L').applyMove('L');
+
+        expect(moved.equals(state)).toBe(true);
+      });
+    });
   });
 });
