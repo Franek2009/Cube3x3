@@ -750,5 +750,66 @@ describe('CubeState', () => {
         expect(moved.equals(state)).toBe(true);
       });
     });
+
+    describe('applyMoves', () => {
+      it('keeps the value unchanged for an empty sequence', () => {
+        const state = solvedState();
+
+        expect(state.applyMoves([]).equals(state)).toBe(true);
+      });
+
+      it('applies a single move like applyMove', () => {
+        const state = solvedState();
+
+        expect(state.applyMoves(['R']).equals(state.applyMove('R'))).toBe(true);
+      });
+
+      it('applies moves from left to right', () => {
+        const state = solvedState();
+        const manual = state.applyMove('R').applyMove('U');
+
+        expect(state.applyMoves(['R', 'U']).equals(manual)).toBe(true);
+      });
+
+      it('applies a sequence of different moves like chained applyMove calls', () => {
+        const state = solvedState();
+        const manual = state.applyMove('R').applyMove('U').applyMove("R'").applyMove("U'");
+
+        expect(state.applyMoves(['R', 'U', "R'", "U'"]).equals(manual)).toBe(true);
+      });
+
+      it('returns to the initial state after a sequence and its inverse', () => {
+        const state = solvedState();
+        const sequence = ['R', 'U', 'F2', "L'", 'D', 'B2'] as const;
+        const inverse = ['B2', "D'", 'L', 'F2', "U'", "R'"] as const;
+
+        expect(state.applyMoves(sequence).applyMoves(inverse).equals(state)).toBe(true);
+      });
+
+      it('works from an arbitrary reachable initial state', () => {
+        const state = solvedState().applyMoves(['F', 'R2', "D'", 'L']);
+        const manual = state.applyMove('B').applyMove("U'").applyMove('F2');
+
+        expect(state.applyMoves(['B', "U'", 'F2']).equals(manual)).toBe(true);
+      });
+
+      it('does not mutate the input CubeState', () => {
+        const state = solvedState().applyMoves(['R', 'F']);
+        const snapshot = state.clone();
+        const moved = state.applyMoves(['U', 'L2', "B'"]);
+
+        expect(state.equals(snapshot)).toBe(true);
+        expect(moved.equals(state)).toBe(false);
+      });
+
+      it('does not mutate the input moves array', () => {
+        const moves = ['R', 'U', 'F2'] as const;
+        const snapshot = [...moves];
+
+        solvedState().applyMoves(moves);
+
+        expect(moves).toEqual(snapshot);
+      });
+    });
   });
 });

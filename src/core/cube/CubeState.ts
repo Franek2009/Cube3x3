@@ -160,6 +160,16 @@ export class CubeState {
     return result;
   }
 
+  applyMoves(moves: readonly Move[]): CubeState {
+    let state: CubeState = this;
+
+    for (const move of moves) {
+      state = state.applyMove(move);
+    }
+
+    return state;
+  }
+
   #applyUQuarterTurn(): CubeState {
     const cornerPermutation = [...this.#cornerPermutation];
     const cornerOrientation = [...this.#cornerOrientation];
