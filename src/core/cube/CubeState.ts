@@ -119,6 +119,15 @@ export class CubeState {
       case 'F2':
         quarterTurns = 2;
         break;
+      case 'B':
+        quarterTurns = 1;
+        break;
+      case "B'":
+        quarterTurns = 3;
+        break;
+      case 'B2':
+        quarterTurns = 2;
+        break;
       default:
         throw new Error(`Move ${move} is not implemented`);
     }
@@ -141,6 +150,9 @@ export class CubeState {
           break;
         case 'F':
           result = result.#applyFQuarterTurn();
+          break;
+        case 'B':
+          result = result.#applyBQuarterTurn();
           break;
       }
     }
@@ -285,6 +297,40 @@ export class CubeState {
     edgeOrientation[5] = (this.#edgeOrientation[8] + 1) % 2;
     edgeOrientation[8] = (this.#edgeOrientation[1] + 1) % 2;
     edgeOrientation[9] = (this.#edgeOrientation[5] + 1) % 2;
+
+    return new CubeState(
+      cornerPermutation,
+      cornerOrientation,
+      edgePermutation,
+      edgeOrientation
+    );
+  }
+
+  #applyBQuarterTurn(): CubeState {
+    const cornerPermutation = [...this.#cornerPermutation];
+    const cornerOrientation = [...this.#cornerOrientation];
+    const edgePermutation = [...this.#edgePermutation];
+    const edgeOrientation = [...this.#edgeOrientation];
+
+    cornerPermutation[2] = this.#cornerPermutation[3];
+    cornerPermutation[3] = this.#cornerPermutation[7];
+    cornerPermutation[6] = this.#cornerPermutation[2];
+    cornerPermutation[7] = this.#cornerPermutation[6];
+
+    cornerOrientation[2] = (this.#cornerOrientation[3] + 1) % 3;
+    cornerOrientation[3] = (this.#cornerOrientation[7] + 2) % 3;
+    cornerOrientation[6] = (this.#cornerOrientation[2] + 2) % 3;
+    cornerOrientation[7] = (this.#cornerOrientation[6] + 1) % 3;
+
+    edgePermutation[3] = this.#edgePermutation[11];
+    edgePermutation[7] = this.#edgePermutation[10];
+    edgePermutation[10] = this.#edgePermutation[3];
+    edgePermutation[11] = this.#edgePermutation[7];
+
+    edgeOrientation[3] = (this.#edgeOrientation[11] + 1) % 2;
+    edgeOrientation[7] = (this.#edgeOrientation[10] + 1) % 2;
+    edgeOrientation[10] = (this.#edgeOrientation[3] + 1) % 2;
+    edgeOrientation[11] = (this.#edgeOrientation[7] + 1) % 2;
 
     return new CubeState(
       cornerPermutation,
