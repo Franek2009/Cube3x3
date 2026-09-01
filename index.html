@@ -6,7 +6,73 @@
     <title>Cube 3x3</title>
   </head>
   <body>
-    <div id="app"></div>
+    <main id="app" class="app-shell">
+      <header class="app-header">
+        <p class="eyebrow">Cube Engine playground</p>
+        <h1>Cube3x3</h1>
+        <p>Manual controls and a technical state preview before the 3D renderer arrives.</p>
+      </header>
+
+      <section class="panel scramble-panel" aria-labelledby="scramble-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Current setup</p>
+            <h2 id="scramble-heading">Scramble</h2>
+          </div>
+          <div class="actions">
+            <button id="new-scramble" class="button button-primary" type="button">
+              New Scramble
+            </button>
+            <button id="reset-cube" class="button" type="button">Reset</button>
+          </div>
+        </div>
+        <p id="scramble" class="scramble" aria-live="polite"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="status-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Session</p>
+            <h2 id="status-heading">Status</h2>
+          </div>
+          <div class="status-grid" aria-live="polite">
+            <p><span>Solved</span><strong id="solved-status"></strong></p>
+            <p><span>User moves</span><strong id="move-count"></strong></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="controls-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Mouse or keyboard</p>
+            <h2 id="controls-heading">Move controls</h2>
+          </div>
+          <p class="keyboard-hint">Keys U D L R F B · hold Shift for prime</p>
+        </div>
+        <div id="move-controls" class="move-grid" aria-label="Cube moves"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="history-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">User input only</p>
+            <h2 id="history-heading">Move history</h2>
+          </div>
+        </div>
+        <p id="move-history" class="history" aria-live="polite"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="debug-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Renderer placeholder</p>
+            <h2 id="debug-heading">Technical cube state</h2>
+          </div>
+        </div>
+        <pre id="debug-state" class="debug-state"></pre>
+      </section>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

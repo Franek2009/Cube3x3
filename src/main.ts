@@ -1,5 +1,4 @@
-const app = document.querySelector<HTMLDivElement>('#app');
+import './styles.css';
+import { initializeApp } from './ui/app.ts';
 
-if (app) {
-  app.textContent = 'Cube 3x3';
-}
+initializeApp();
