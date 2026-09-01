@@ -152,7 +152,7 @@ describe('CubeState', () => {
     });
 
     it('throws for a move that is not implemented yet', () => {
-      expect(() => solvedState().applyMove('F')).toThrow('Move F is not implemented');
+      expect(() => solvedState().applyMove('B')).toThrow('Move B is not implemented');
     });
 
     describe('D moves', () => {
@@ -441,6 +441,127 @@ describe('CubeState', () => {
           [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0]
         );
         const moved = state.applyMove('L').applyMove('L').applyMove('L').applyMove('L');
+
+        expect(moved.equals(state)).toBe(true);
+      });
+    });
+
+    describe('F moves', () => {
+      it('applies the exact F transformation and changes the solved state', () => {
+        const moved = solvedState().applyMove('F');
+
+        expect(moved.isSolved()).toBe(false);
+        expect(moved.cornerPermutation).toEqual([1, 5, 2, 3, 0, 4, 6, 7]);
+        expect(moved.cornerOrientation).toEqual([1, 2, 0, 0, 2, 1, 0, 0]);
+        expect(moved.edgePermutation).toEqual([0, 9, 2, 3, 4, 8, 6, 7, 1, 5, 10, 11]);
+        expect(moved.edgeOrientation).toEqual([0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0]);
+      });
+
+      it('does not mutate the original state', () => {
+        const state = solvedState();
+        const moved = state.applyMove('F');
+
+        expect(moved).not.toBe(state);
+        expect(state.isSolved()).toBe(true);
+      });
+
+      it('returns to identity after four F moves', () => {
+        const state = solvedState();
+        const moved = state.applyMove('F').applyMove('F').applyMove('F').applyMove('F');
+
+        expect(moved.equals(state)).toBe(true);
+      });
+
+      it("returns to identity after F followed by F'", () => {
+        const state = solvedState();
+
+        expect(state.applyMove('F').applyMove("F'").equals(state)).toBe(true);
+      });
+
+      it("returns to identity after F' followed by F", () => {
+        const state = solvedState();
+
+        expect(state.applyMove("F'").applyMove('F').equals(state)).toBe(true);
+      });
+
+      it('returns to identity after two F2 moves', () => {
+        const state = solvedState();
+
+        expect(state.applyMove('F2').applyMove('F2').equals(state)).toBe(true);
+      });
+
+      it('applies F2 like two F moves', () => {
+        const state = solvedState();
+
+        expect(state.applyMove('F2').equals(state.applyMove('F').applyMove('F'))).toBe(true);
+      });
+
+      it("applies F' like three F moves", () => {
+        const state = solvedState();
+        const threeQuarterTurns = state.applyMove('F').applyMove('F').applyMove('F');
+
+        expect(state.applyMove("F'").equals(threeQuarterTurns)).toBe(true);
+      });
+
+      it('keeps the corner orientation sum divisible by three', () => {
+        const orientationSum = solvedState()
+          .applyMove('F')
+          .cornerOrientation.reduce((sum, orientation) => sum + orientation, 0);
+
+        expect(orientationSum % 3).toBe(0);
+      });
+
+      it('keeps the edge orientation sum divisible by two', () => {
+        const orientationSum = solvedState()
+          .applyMove('F')
+          .edgeOrientation.reduce((sum, orientation) => sum + orientation, 0);
+
+        expect(orientationSum % 2).toBe(0);
+      });
+
+      it('flips all four edges in the F layer', () => {
+        const edgeOrientation = solvedState().applyMove('F').edgeOrientation;
+
+        expect([edgeOrientation[1], edgeOrientation[5], edgeOrientation[8], edgeOrientation[9]])
+          .toEqual([1, 1, 1, 1]);
+      });
+
+      it('does not change cubies outside the F layer', () => {
+        const state = solvedState();
+        const moved = state.applyMove('F');
+
+        for (const index of [2, 3, 6, 7]) {
+          expect(moved.cornerPermutation[index]).toBe(state.cornerPermutation[index]);
+          expect(moved.cornerOrientation[index]).toBe(state.cornerOrientation[index]);
+        }
+
+        for (const index of [0, 2, 3, 4, 6, 7, 10, 11]) {
+          expect(moved.edgePermutation[index]).toBe(state.edgePermutation[index]);
+          expect(moved.edgeOrientation[index]).toBe(state.edgeOrientation[index]);
+        }
+      });
+
+      it('moves existing orientations and applies F deltas', () => {
+        const state = new CubeState(
+          [0, 1, 2, 3, 4, 5, 6, 7],
+          [1, 1, 0, 0, 1, 0, 0, 0],
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+          [0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
+        );
+        const moved = state.applyMove('F');
+
+        expect(moved.cornerOrientation).toEqual([2, 2, 0, 0, 0, 2, 0, 0]);
+        expect(moved.edgeOrientation).toEqual([0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0]);
+      });
+
+      it('restores a state with non-zero orientations after four F moves', () => {
+        const state = new CubeState(
+          [0, 1, 2, 3, 4, 5, 6, 7],
+          [1, 1, 0, 0, 1, 0, 0, 0],
+          [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+          [0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
+        );
+        const moved = state.applyMove('F').applyMove('F').applyMove('F').applyMove('F');
 
         expect(moved.equals(state)).toBe(true);
       });
