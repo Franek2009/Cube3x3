@@ -51,6 +51,7 @@ export function initializeApp(): void {
   const moveCountElement = getRequiredElement<HTMLElement>('move-count');
   const timerTimeElement = getRequiredElement<HTMLElement>('timer-time');
   const timerStatusElement = getRequiredElement<HTMLElement>('timer-status');
+  const timerPanelElement = getRequiredElement<HTMLElement>('timer-panel');
   const lastTimeElement = getRequiredElement<HTMLElement>('last-time');
   const bestTimeElement = getRequiredElement<HTMLElement>('best-time');
   const ao5Element = getRequiredElement<HTMLElement>('ao5');
@@ -79,6 +80,7 @@ export function initializeApp(): void {
   };
 
   const renderTimer = (now?: number): void => {
+    timerPanelElement.dataset.state = timer.getState();
     timerTimeElement.textContent = formatElapsedTime(timer.getElapsedMs(now));
     timerStatusElement.textContent = timerStatusLabels[timer.getState()];
   };
