@@ -8,6 +8,7 @@ import {
 } from '../core/results/solveStorage.ts';
 import { generateScramble } from '../core/scramble/scrambler.ts';
 import { CubeSession } from '../core/session/CubeSession.ts';
+import { SolverClient } from '../core/solver/SolverClient.ts';
 import {
   formatElapsedTime,
   SolveTimer,
@@ -15,6 +16,10 @@ import {
 } from '../core/timer/SolveTimer.ts';
 import { CubeRenderer } from '../renderer/CubeRenderer.ts';
 import { installKeyboardControls } from './keyboard.ts';
+import {
+  prewarmSolverForApp,
+  type SolverUiState
+} from './solverStatus.ts';
 
 function getRequiredElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -35,6 +40,7 @@ interface MoveTransition {
 export function initializeApp(): void {
   const session = new CubeSession();
   const timer = new SolveTimer();
+  const solverClient = new SolverClient();
   let solveStorage: KeyValueStorage | undefined;
 
   try {
@@ -52,6 +58,7 @@ export function initializeApp(): void {
   const timerTimeElement = getRequiredElement<HTMLElement>('timer-time');
   const timerStatusElement = getRequiredElement<HTMLElement>('timer-status');
   const timerPanelElement = getRequiredElement<HTMLElement>('timer-panel');
+  const solverStatusElement = getRequiredElement<HTMLElement>('solver-status');
   const lastTimeElement = getRequiredElement<HTMLElement>('last-time');
   const bestTimeElement = getRequiredElement<HTMLElement>('best-time');
   const ao5Element = getRequiredElement<HTMLElement>('ao5');
@@ -77,6 +84,16 @@ export function initializeApp(): void {
     ready: 'Ready',
     running: 'Running',
     stopped: 'Stopped'
+  };
+  const solverStatusLabels: Readonly<Record<SolverUiState, string>> = {
+    preparing: 'Preparing solver…',
+    ready: 'Solver ready',
+    error: 'Solver unavailable'
+  };
+
+  const renderSolverStatus = (state: SolverUiState): void => {
+    solverStatusElement.dataset.state = state;
+    solverStatusElement.textContent = solverStatusLabels[state];
   };
 
   const renderTimer = (now?: number): void => {
@@ -249,4 +266,11 @@ export function initializeApp(): void {
 
   renderStatistics();
   applyNewScramble();
+  setTimeout(() => {
+    void prewarmSolverForApp(
+      solverClient,
+      renderSolverStatus,
+      (error) => console.error('Solver prewarm failed', error)
+    );
+  }, 0);
 }

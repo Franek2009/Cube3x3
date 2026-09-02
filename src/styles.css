@@ -40,11 +40,36 @@ button {
   letter-spacing: -0.06em;
 }
 
-.app-header > p:last-child {
+.app-header .app-description {
   max-width: 42rem;
   margin: 0.75rem 0 0;
   color: #9ba9bd;
   line-height: 1.6;
+}
+
+.app-header .solver-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.8rem;
+  margin-top: 1rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid #334158;
+  border-radius: 999px;
+  color: #9ba9bd;
+  background: rgba(18, 25, 37, 0.72);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.solver-status[data-state="ready"] {
+  border-color: #3f665f;
+  color: #a9d4c9;
+}
+
+.solver-status[data-state="error"] {
+  border-color: #6f4b47;
+  color: #d6aaa4;
 }
 
 .eyebrow {

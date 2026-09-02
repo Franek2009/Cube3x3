@@ -10,7 +10,15 @@
       <header class="app-header">
         <p class="eyebrow">Cube Engine playground</p>
         <h1>Cube3x3</h1>
-        <p>Interactive cube controls with a live 3D view and technical state preview.</p>
+        <p class="app-description">Interactive cube controls with a live 3D view and technical state preview.</p>
+        <p
+          id="solver-status"
+          class="solver-status"
+          data-state="preparing"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >Preparing solver…</p>
       </header>
 
       <section class="panel cube-panel" aria-labelledby="cube-heading">
