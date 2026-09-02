@@ -77,6 +77,39 @@ button {
   font-size: 1.15rem;
 }
 
+.timer-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.timer-panel h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.timer-display {
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-time {
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.timer-status {
+  color: #8f9db1;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -220,6 +253,15 @@ button {
   .section-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .timer-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .timer-display {
+    justify-items: start;
   }
 
   .status-grid {

@@ -1,6 +1,11 @@
 import { ALL_MOVES, type Move } from '../core/moves/moves.ts';
 import { generateScramble } from '../core/scramble/scrambler.ts';
 import { CubeSession } from '../core/session/CubeSession.ts';
+import {
+  formatElapsedTime,
+  SolveTimer,
+  type SolveTimerState
+} from '../core/timer/SolveTimer.ts';
 import { CubeRenderer } from '../renderer/CubeRenderer.ts';
 import { installKeyboardControls } from './keyboard.ts';
 
@@ -14,11 +19,20 @@ function getRequiredElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
+interface MoveTransition {
+  readonly move: Move;
+  readonly fromState: ReturnType<CubeSession['getState']>;
+  readonly toState: ReturnType<CubeSession['getState']>;
+}
+
 export function initializeApp(): void {
   const session = new CubeSession();
+  const timer = new SolveTimer();
   const scrambleElement = getRequiredElement<HTMLParagraphElement>('scramble');
   const solvedElement = getRequiredElement<HTMLElement>('solved-status');
   const moveCountElement = getRequiredElement<HTMLElement>('move-count');
+  const timerTimeElement = getRequiredElement<HTMLElement>('timer-time');
+  const timerStatusElement = getRequiredElement<HTMLElement>('timer-status');
   const historyElement = getRequiredElement<HTMLParagraphElement>('move-history');
   const debugElement = getRequiredElement<HTMLPreElement>('debug-state');
   const controlsElement = getRequiredElement<HTMLDivElement>('move-controls');
@@ -27,11 +41,46 @@ export function initializeApp(): void {
   const rendererContainer = getRequiredElement<HTMLDivElement>('cube-viewport');
   const cubeRenderer = new CubeRenderer(rendererContainer);
   let currentScramble: Move[] = [];
-  const moveQueue: Move[] = [];
-  let processingMoves = false;
+  const animationQueue: MoveTransition[] = [];
+  let processingAnimations = false;
   let sessionGeneration = 0;
+  let timerFrameId: number | undefined;
 
-  const renderUi = (): void => {
+  const timerStatusLabels: Readonly<Record<SolveTimerState, string>> = {
+    idle: 'Idle',
+    ready: 'Ready',
+    running: 'Running',
+    stopped: 'Stopped'
+  };
+
+  const renderTimer = (now?: number): void => {
+    timerTimeElement.textContent = formatElapsedTime(timer.getElapsedMs(now));
+    timerStatusElement.textContent = timerStatusLabels[timer.getState()];
+  };
+
+  const cancelTimerFrame = (): void => {
+    if (timerFrameId !== undefined) {
+      cancelAnimationFrame(timerFrameId);
+      timerFrameId = undefined;
+    }
+  };
+
+  const updateRunningTimer = (now: number): void => {
+    timerFrameId = undefined;
+
+    if (timer.getState() !== 'running') return;
+
+    renderTimer(now);
+    timerFrameId = requestAnimationFrame(updateRunningTimer);
+  };
+
+  const startTimerUpdates = (): void => {
+    if (timerFrameId === undefined) {
+      timerFrameId = requestAnimationFrame(updateRunningTimer);
+    }
+  };
+
+  const renderUi = (now?: number): void => {
     const state = session.getState();
     const history = session.getMoveHistory();
 
@@ -41,6 +90,7 @@ export function initializeApp(): void {
     solvedElement.textContent = session.isSolved() ? 'Yes' : 'No';
     moveCountElement.textContent = String(history.length);
     historyElement.textContent = history.join(' ');
+    renderTimer(now);
     debugElement.textContent = [
       `Solved: ${session.isSolved() ? 'yes' : 'no'}`,
       `Moves: ${history.length}`,
@@ -53,29 +103,47 @@ export function initializeApp(): void {
     ].join('\n');
   };
 
-  const processMoveQueue = async (): Promise<void> => {
-    if (processingMoves) return;
-    processingMoves = true;
+  const processAnimationQueue = async (): Promise<void> => {
+    if (processingAnimations) return;
+    processingAnimations = true;
     const generation = sessionGeneration;
 
     try {
-      while (moveQueue.length > 0 && generation === sessionGeneration) {
-        const move = moveQueue.shift();
-        if (move === undefined) break;
-        const fromState = session.getState();
-        const toState = session.applyMove(move);
-        renderUi();
-        await cubeRenderer.animateMove(move, fromState, toState);
+      while (animationQueue.length > 0 && generation === sessionGeneration) {
+        const transition = animationQueue.shift();
+        if (transition === undefined) break;
+
+        await cubeRenderer.animateMove(
+          transition.move,
+          transition.fromState,
+          transition.toState
+        );
       }
     } finally {
-      processingMoves = false;
-      if (moveQueue.length > 0) void processMoveQueue();
+      processingAnimations = false;
+      if (animationQueue.length > 0) void processAnimationQueue();
     }
   };
 
   const applyUserMove = (move: Move): void => {
-    moveQueue.push(move);
-    void processMoveQueue();
+    const now = performance.now();
+    const fromState = session.getState();
+
+    if (timer.getState() === 'ready') {
+      timer.start(now);
+      startTimerUpdates();
+    }
+
+    const toState = session.applyMove(move);
+
+    if (session.isSolved() && timer.getState() === 'running') {
+      timer.stop(now);
+      cancelTimerFrame();
+    }
+
+    renderUi(now);
+    animationQueue.push({ move, fromState, toState });
+    void processAnimationQueue();
   };
 
   for (const move of ALL_MOVES) {
@@ -89,8 +157,10 @@ export function initializeApp(): void {
   }
 
   const applyNewScramble = (): void => {
-    moveQueue.length = 0;
+    animationQueue.length = 0;
     sessionGeneration += 1;
+    cancelTimerFrame();
+    timer.prepare();
     session.reset();
     currentScramble = generateScramble(25);
     session.applyScramble(currentScramble);
@@ -100,8 +170,10 @@ export function initializeApp(): void {
 
   newScrambleButton.addEventListener('click', applyNewScramble);
   resetButton.addEventListener('click', () => {
-    moveQueue.length = 0;
+    animationQueue.length = 0;
     sessionGeneration += 1;
+    cancelTimerFrame();
+    timer.reset();
     session.reset();
     currentScramble = [];
     cubeRenderer.renderState(session.getState());
