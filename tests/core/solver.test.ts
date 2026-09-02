@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CubeState, solvedState } from '../../src/core/cube/CubeState.ts';
 import { ALL_MOVES, type Move } from '../../src/core/moves/moves.ts';
+import { generateScramble } from '../../src/core/scramble/scrambler.ts';
 import { solveCube, type SolveResult } from '../../src/core/solver/solver.ts';
 
 function expectSolved(state: CubeState, result: SolveResult): asserts result is Extract<
@@ -16,8 +17,19 @@ function expectSolved(state: CubeState, result: SolveResult): asserts result is 
   expect(result.depth).toBe(result.moves.length);
 }
 
+function createPrng(seed: number): () => number {
+  let state = seed >>> 0;
+
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    return (state >>> 0) / 0x1_0000_0000;
+  };
+}
+
 describe('solveCube', () => {
-  it('returns an empty depth-zero solution for a solved state', () => {
+  it('returns a frozen empty depth-zero solution for a solved state', () => {
     const result = solveCube(solvedState(), { maxDepth: 0 });
 
     expect(result).toEqual({ solved: true, moves: [], depth: 0 });
@@ -32,62 +44,38 @@ describe('solveCube', () => {
     expect(result.depth).toBe(1);
   });
 
-  it('solves every two-move sequence within depth two', () => {
-    for (const first of ALL_MOVES) {
-      for (const second of ALL_MOVES) {
-        const state = solvedState().applyMoves([first, second]);
-        const result = solveCube(state, { maxDepth: 2 });
+  it('treats maxDepth as a total Phase 1 plus Phase 2 limit', () => {
+    const state = solvedState().applyMove('R');
 
-        expectSolved(state, result);
-        expect(result.depth).toBeLessThanOrEqual(2);
-      }
-    }
+    expect(solveCube(state, { maxDepth: 0 })).toEqual({
+      solved: false,
+      reason: 'depth-limit'
+    });
+
+    const result = solveCube(state, { maxDepth: 1 });
+    expectSolved(state, result);
+    expect(result.depth).toBe(1);
   });
 
   it.each([
-    [['R', 'U', 'F'], 3],
-    [['R', 'U', 'F', 'L'], 4],
-    [['R', 'U', 'F', 'L', 'B'], 5]
-  ] as const)('solves the sequence %j within depth %i', (moves, maxDepth) => {
-    const state = solvedState().applyMoves(moves);
-    const result = solveCube(state, { maxDepth });
+    [10, 0x0000_0001],
+    [20, 0x1234_5678],
+    [25, 0xdead_beef],
+    [25, 0xcafe_babe]
+  ] as const)('solves a deterministic %i-move scramble (seed %i)', (length, seed) => {
+    const scramble = generateScramble(length, createPrng(seed));
+    const state = solvedState().applyMoves(scramble);
+    const result = solveCube(state, { maxDepth: 30 });
 
     expectSolved(state, result);
-    expect(result.depth).toBeLessThanOrEqual(maxDepth);
-  });
-
-  it('returns depth-limit when the limit is too small and solves at the exact depth', () => {
-    const state = solvedState().applyMoves(['R', 'U', 'F']);
-
-    expect(solveCube(state, { maxDepth: 2 })).toEqual({
-      solved: false,
-      reason: 'depth-limit'
-    });
-
-    const result = solveCube(state, { maxDepth: 3 });
-    expectSolved(state, result);
-    expect(result.depth).toBe(3);
+    expect(result.depth).toBeLessThanOrEqual(30);
   });
 
   it('returns deterministic output', () => {
-    const state = solvedState().applyMoves(['R', 'U', 'F']);
+    const scramble = generateScramble(20, createPrng(0x3141_5926));
+    const state = solvedState().applyMoves(scramble);
 
-    expect(solveCube(state, { maxDepth: 3 })).toEqual(solveCube(state, { maxDepth: 3 }));
-  });
-
-  it('solves commuting opposite faces despite canonical ordering pruning', () => {
-    const state = solvedState().applyMoves(['D', 'U']);
-    const result = solveCube(state, { maxDepth: 2 });
-
-    expectSolved(state, result);
-    expect(result.depth).toBe(2);
-  });
-
-  it('returns depth-limit for an unsolved state at depth zero', () => {
-    expect(solveCube(solvedState().applyMove('R'), { maxDepth: 0 })).toEqual({
-      solved: false,
-      reason: 'depth-limit'
-    });
+    expect(solveCube(state)).toEqual(solveCube(state));
   });
 
   it('returns invalid-state for an illegally flipped edge', () => {
@@ -124,26 +112,35 @@ describe('solveCube', () => {
     const state = solvedState().applyMoves(['R', 'U', 'F']);
     const snapshot = state.clone();
 
-    solveCube(state, { maxDepth: 3 });
+    solveCube(state, { maxDepth: 10 });
     expect(state.equals(snapshot)).toBe(true);
 
-    solveCube(state, { maxDepth: 2 });
+    solveCube(state, { maxDepth: 0 });
     expect(state.equals(snapshot)).toBe(true);
   });
 
-  it('does not expose an internal mutable path', () => {
+  it('returns a frozen solution that does not alias phase paths', () => {
     const state = solvedState().applyMoves(['R', 'U']);
-    const first = solveCube(state, { maxDepth: 2 });
+    const first = solveCube(state, { maxDepth: 10 });
     expectSolved(state, first);
     expect(Object.isFrozen(first.moves)).toBe(true);
 
     expect(() => (first.moves as Move[]).push('F')).toThrow(TypeError);
 
-    const second = solveCube(state, { maxDepth: 2 });
+    const second = solveCube(state, { maxDepth: 10 });
     expect(second).toEqual(first);
   });
 
-  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 7])(
+  it('accepts limits above the F7 cap and above the default', () => {
+    expectSolved(solvedState().applyMove('R'), solveCube(solvedState().applyMove('R'), {
+      maxDepth: 7
+    }));
+    expectSolved(solvedState().applyMove('R'), solveCube(solvedState().applyMove('R'), {
+      maxDepth: 31
+    }));
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
     'rejects invalid maxDepth %s',
     (maxDepth) => {
       expect(() => solveCube(solvedState(), { maxDepth })).toThrow(RangeError);
