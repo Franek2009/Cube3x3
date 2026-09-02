@@ -16,6 +16,7 @@ import {
 } from '../core/timer/SolveTimer.ts';
 import { CubeRenderer } from '../renderer/CubeRenderer.ts';
 import { installKeyboardControls } from './keyboard.ts';
+import { SolveCommandController } from './SolveCommandController.ts';
 import {
   prewarmSolverForApp,
   type SolverUiState
@@ -70,7 +71,11 @@ export function initializeApp(): void {
   const controlsElement = getRequiredElement<HTMLDivElement>('move-controls');
   const newScrambleButton = getRequiredElement<HTMLButtonElement>('new-scramble');
   const resetButton = getRequiredElement<HTMLButtonElement>('reset-cube');
+  const solveButton = getRequiredElement<HTMLButtonElement>('solve-cube');
   const clearHistoryButton = getRequiredElement<HTMLButtonElement>('clear-history');
+  const solutionOutputElement = getRequiredElement<HTMLElement>('solution-output');
+  const solutionSummaryElement = getRequiredElement<HTMLParagraphElement>('solution-summary');
+  const solutionMovesElement = getRequiredElement<HTMLParagraphElement>('solution-moves');
   const rendererContainer = getRequiredElement<HTMLDivElement>('cube-viewport');
   const cubeRenderer = new CubeRenderer(rendererContainer);
   let currentScramble: Move[] = [];
@@ -88,13 +93,49 @@ export function initializeApp(): void {
   const solverStatusLabels: Readonly<Record<SolverUiState, string>> = {
     preparing: 'Preparing solver…',
     ready: 'Solver ready',
+    solving: 'Solving…',
     error: 'Solver unavailable'
   };
 
   const renderSolverStatus = (state: SolverUiState): void => {
     solverStatusElement.dataset.state = state;
     solverStatusElement.textContent = solverStatusLabels[state];
+    solveButton.disabled = state !== 'ready';
   };
+
+  const renderSolution = (result: Awaited<ReturnType<SolverClient['solve']>> | undefined): void => {
+    if (result === undefined) {
+      solutionOutputElement.hidden = true;
+      solutionSummaryElement.textContent = '';
+      solutionMovesElement.textContent = '';
+      solutionMovesElement.hidden = true;
+      return;
+    }
+
+    solutionOutputElement.hidden = false;
+    solutionMovesElement.hidden = true;
+    solutionMovesElement.textContent = '';
+
+    if (result.solved) {
+      if (result.depth === 0) {
+        solutionSummaryElement.textContent = 'Cube is already solved.';
+      } else {
+        solutionSummaryElement.textContent = `Solution · ${result.depth} ${result.depth === 1 ? 'move' : 'moves'}`;
+        solutionMovesElement.textContent = result.moves.join(' ');
+        solutionMovesElement.hidden = false;
+      }
+    } else if (result.reason === 'depth-limit') {
+      solutionSummaryElement.textContent = 'No solution found within the depth limit.';
+    } else {
+      solutionSummaryElement.textContent = 'The current cube state is invalid.';
+    }
+  };
+
+  const solveController = new SolveCommandController(solverClient, {
+    onStateChange: renderSolverStatus,
+    onResultChange: renderSolution,
+    reportError: (error) => console.error('Solver solve failed', error)
+  });
 
   const renderTimer = (now?: number): void => {
     timerPanelElement.dataset.state = timer.getState();
@@ -200,6 +241,7 @@ export function initializeApp(): void {
     }
 
     const toState = session.applyMove(move);
+    solveController.invalidateCubeState();
 
     if (session.isSolved() && timer.getState() === 'running') {
       const finalTime = timer.stop(now);
@@ -239,17 +281,23 @@ export function initializeApp(): void {
     session.reset();
     currentScramble = generateScramble(25);
     session.applyScramble(currentScramble);
+    solveController.invalidateCubeState();
     cubeRenderer.renderState(session.getState());
     renderUi();
   };
 
   newScrambleButton.addEventListener('click', applyNewScramble);
+  solveButton.addEventListener('click', () => {
+    const snapshot = session.getState();
+    void solveController.solve(snapshot);
+  });
   resetButton.addEventListener('click', () => {
     animationQueue.length = 0;
     sessionGeneration += 1;
     cancelTimerFrame();
     timer.reset();
     session.reset();
+    solveController.invalidateCubeState();
     currentScramble = [];
     cubeRenderer.renderState(session.getState());
     renderUi();
@@ -269,7 +317,7 @@ export function initializeApp(): void {
   setTimeout(() => {
     void prewarmSolverForApp(
       solverClient,
-      renderSolverStatus,
+      (state) => solveController.setServiceState(state),
       (error) => console.error('Solver prewarm failed', error)
     );
   }, 0);

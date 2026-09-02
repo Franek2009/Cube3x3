@@ -67,6 +67,11 @@ button {
   color: #a9d4c9;
 }
 
+.solver-status[data-state="solving"] {
+  border-color: #526da9;
+  color: #b8c8ee;
+}
+
 .solver-status[data-state="error"] {
   border-color: #6f4b47;
   color: #d6aaa4;
@@ -256,6 +261,36 @@ button {
   letter-spacing: 0.025em;
   line-height: 1.9;
   word-spacing: 0.3em;
+}
+
+.solution-output {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #273449;
+  border-radius: 0.75rem;
+  background: rgba(13, 20, 31, 0.72);
+}
+
+.solution-summary,
+.solution-moves {
+  margin: 0;
+}
+
+.solution-summary {
+  color: #aab8cc;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.solution-moves {
+  margin-top: 0.55rem;
+  color: #e1e9f7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  word-spacing: 0.2em;
 }
 
 .cube-panel {

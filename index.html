@@ -54,9 +54,20 @@
               New Scramble
             </button>
             <button id="reset-cube" class="button" type="button">Reset</button>
+            <button id="solve-cube" class="button" type="button" disabled>Solve</button>
           </div>
         </div>
         <p id="scramble" class="scramble" aria-live="polite"></p>
+        <div
+          id="solution-output"
+          class="solution-output"
+          aria-live="polite"
+          aria-atomic="true"
+          hidden
+        >
+          <p id="solution-summary" class="solution-summary"></p>
+          <p id="solution-moves" class="solution-moves"></p>
+        </div>
       </section>
 
       <section class="panel" aria-labelledby="status-heading">

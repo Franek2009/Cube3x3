@@ -2,11 +2,12 @@ export interface SolverPrewarmClient {
   prewarm(): Promise<void>;
 }
 
-export type SolverUiState = 'preparing' | 'ready' | 'error';
+export type SolverServiceUiState = 'preparing' | 'ready' | 'error';
+export type SolverUiState = SolverServiceUiState | 'solving';
 
 export async function prewarmSolverForApp(
   client: SolverPrewarmClient,
-  onStateChange: (state: SolverUiState) => void,
+  onStateChange: (state: SolverServiceUiState) => void,
   reportError: (error: unknown) => void = console.error
 ): Promise<void> {
   onStateChange('preparing');
