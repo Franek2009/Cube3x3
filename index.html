@@ -64,6 +64,25 @@
         </div>
       </section>
 
+      <section class="panel" aria-labelledby="statistics-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Solve history</p>
+            <h2 id="statistics-heading">Statistics</h2>
+          </div>
+          <button id="clear-history" class="button" type="button">Clear History</button>
+        </div>
+        <div class="statistics-grid" aria-live="polite">
+          <p><span>Last</span><strong id="last-time">—</strong></p>
+          <p><span>Best</span><strong id="best-time">—</strong></p>
+          <p><span>Ao5</span><strong id="ao5">—</strong></p>
+          <p><span>Ao12</span><strong id="ao12">—</strong></p>
+          <p><span>Solves</span><strong id="solve-count">0</strong></p>
+        </div>
+        <h3 class="recent-heading">Recent solves</h3>
+        <ol id="recent-solves" class="recent-solves"></ol>
+      </section>
+
       <section class="panel" aria-labelledby="controls-heading">
         <div class="section-heading">
           <div>

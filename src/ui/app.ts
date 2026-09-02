@@ -1,4 +1,11 @@
 import { ALL_MOVES, type Move } from '../core/moves/moves.ts';
+import { SolveHistory } from '../core/results/SolveResults.ts';
+import {
+  clearSolveRecords,
+  loadSolveRecords,
+  saveSolveRecords,
+  type KeyValueStorage
+} from '../core/results/solveStorage.ts';
 import { generateScramble } from '../core/scramble/scrambler.ts';
 import { CubeSession } from '../core/session/CubeSession.ts';
 import {
@@ -28,16 +35,34 @@ interface MoveTransition {
 export function initializeApp(): void {
   const session = new CubeSession();
   const timer = new SolveTimer();
+  let solveStorage: KeyValueStorage | undefined;
+
+  try {
+    solveStorage = window.localStorage;
+  } catch {
+    solveStorage = undefined;
+  }
+
+  const solveHistory = new SolveHistory(
+    solveStorage === undefined ? [] : loadSolveRecords(solveStorage)
+  );
   const scrambleElement = getRequiredElement<HTMLParagraphElement>('scramble');
   const solvedElement = getRequiredElement<HTMLElement>('solved-status');
   const moveCountElement = getRequiredElement<HTMLElement>('move-count');
   const timerTimeElement = getRequiredElement<HTMLElement>('timer-time');
   const timerStatusElement = getRequiredElement<HTMLElement>('timer-status');
+  const lastTimeElement = getRequiredElement<HTMLElement>('last-time');
+  const bestTimeElement = getRequiredElement<HTMLElement>('best-time');
+  const ao5Element = getRequiredElement<HTMLElement>('ao5');
+  const ao12Element = getRequiredElement<HTMLElement>('ao12');
+  const solveCountElement = getRequiredElement<HTMLElement>('solve-count');
+  const recentSolvesElement = getRequiredElement<HTMLOListElement>('recent-solves');
   const historyElement = getRequiredElement<HTMLParagraphElement>('move-history');
   const debugElement = getRequiredElement<HTMLPreElement>('debug-state');
   const controlsElement = getRequiredElement<HTMLDivElement>('move-controls');
   const newScrambleButton = getRequiredElement<HTMLButtonElement>('new-scramble');
   const resetButton = getRequiredElement<HTMLButtonElement>('reset-cube');
+  const clearHistoryButton = getRequiredElement<HTMLButtonElement>('clear-history');
   const rendererContainer = getRequiredElement<HTMLDivElement>('cube-viewport');
   const cubeRenderer = new CubeRenderer(rendererContainer);
   let currentScramble: Move[] = [];
@@ -77,6 +102,27 @@ export function initializeApp(): void {
   const startTimerUpdates = (): void => {
     if (timerFrameId === undefined) {
       timerFrameId = requestAnimationFrame(updateRunningTimer);
+    }
+  };
+
+  const formatStatistic = (timeMs: number | undefined): string => (
+    timeMs === undefined ? '—' : formatElapsedTime(timeMs)
+  );
+
+  const renderStatistics = (): void => {
+    const records = solveHistory.getAll();
+
+    lastTimeElement.textContent = formatStatistic(solveHistory.getLast()?.timeMs);
+    bestTimeElement.textContent = formatStatistic(solveHistory.getBest()?.timeMs);
+    ao5Element.textContent = formatStatistic(solveHistory.getAo5());
+    ao12Element.textContent = formatStatistic(solveHistory.getAo12());
+    solveCountElement.textContent = String(records.length);
+    recentSolvesElement.replaceChildren();
+
+    for (const record of records.slice(-5).reverse()) {
+      const item = document.createElement('li');
+      item.textContent = formatElapsedTime(record.timeMs);
+      recentSolvesElement.append(item);
     }
   };
 
@@ -137,8 +183,18 @@ export function initializeApp(): void {
     const toState = session.applyMove(move);
 
     if (session.isSolved() && timer.getState() === 'running') {
-      timer.stop(now);
+      const finalTime = timer.stop(now);
       cancelTimerFrame();
+      solveHistory.add({
+        timeMs: finalTime,
+        scramble: [...currentScramble],
+        moveCount: session.getMoveHistory().length,
+        completedAt: Date.now()
+      });
+      if (solveStorage !== undefined) {
+        saveSolveRecords(solveStorage, solveHistory.getAll());
+      }
+      renderStatistics();
     }
 
     renderUi(now);
@@ -179,8 +235,16 @@ export function initializeApp(): void {
     cubeRenderer.renderState(session.getState());
     renderUi();
   });
+  clearHistoryButton.addEventListener('click', () => {
+    solveHistory.clear();
+    if (solveStorage !== undefined) {
+      clearSolveRecords(solveStorage);
+    }
+    renderStatistics();
+  });
 
   void installKeyboardControls(applyUserMove);
 
+  renderStatistics();
   applyNewScramble();
 }

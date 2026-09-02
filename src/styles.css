@@ -209,6 +209,54 @@ button {
   font-size: 1.25rem;
 }
 
+.statistics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.statistics-grid p {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.9rem;
+  border-radius: 0.7rem;
+  background: #111925;
+}
+
+.statistics-grid span,
+.recent-heading {
+  color: #8f9db1;
+  font-size: 0.8rem;
+}
+
+.statistics-grid strong {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.recent-heading {
+  margin: 1.25rem 0 0.5rem;
+  font-weight: 500;
+}
+
+.recent-solves {
+  margin: 0;
+  padding-left: 2rem;
+  color: #dce5f5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.65;
+}
+
+.recent-solves:empty::before {
+  margin-left: -2rem;
+  color: #718096;
+  content: "No completed solves yet";
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
 .keyboard-hint {
   margin: 0;
   text-align: right;
@@ -266,6 +314,10 @@ button {
 
   .status-grid {
     width: 100%;
+  }
+
+  .statistics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .keyboard-hint {
