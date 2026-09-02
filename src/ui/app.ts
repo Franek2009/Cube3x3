@@ -27,12 +27,14 @@ export function initializeApp(): void {
   const rendererContainer = getRequiredElement<HTMLDivElement>('cube-viewport');
   const cubeRenderer = new CubeRenderer(rendererContainer);
   let currentScramble: Move[] = [];
+  const moveQueue: Move[] = [];
+  let processingMoves = false;
+  let sessionGeneration = 0;
 
-  const render = (): void => {
+  const renderUi = (): void => {
     const state = session.getState();
     const history = session.getMoveHistory();
 
-    cubeRenderer.renderState(state);
     scrambleElement.textContent = currentScramble.length > 0
       ? currentScramble.join(' ')
       : 'No scramble applied';
@@ -51,9 +53,29 @@ export function initializeApp(): void {
     ].join('\n');
   };
 
+  const processMoveQueue = async (): Promise<void> => {
+    if (processingMoves) return;
+    processingMoves = true;
+    const generation = sessionGeneration;
+
+    try {
+      while (moveQueue.length > 0 && generation === sessionGeneration) {
+        const move = moveQueue.shift();
+        if (move === undefined) break;
+        const fromState = session.getState();
+        const toState = session.applyMove(move);
+        renderUi();
+        await cubeRenderer.animateMove(move, fromState, toState);
+      }
+    } finally {
+      processingMoves = false;
+      if (moveQueue.length > 0) void processMoveQueue();
+    }
+  };
+
   const applyUserMove = (move: Move): void => {
-    session.applyMove(move);
-    render();
+    moveQueue.push(move);
+    void processMoveQueue();
   };
 
   for (const move of ALL_MOVES) {
@@ -67,17 +89,23 @@ export function initializeApp(): void {
   }
 
   const applyNewScramble = (): void => {
+    moveQueue.length = 0;
+    sessionGeneration += 1;
     session.reset();
     currentScramble = generateScramble(25);
     session.applyScramble(currentScramble);
-    render();
+    cubeRenderer.renderState(session.getState());
+    renderUi();
   };
 
   newScrambleButton.addEventListener('click', applyNewScramble);
   resetButton.addEventListener('click', () => {
+    moveQueue.length = 0;
+    sessionGeneration += 1;
     session.reset();
     currentScramble = [];
-    render();
+    cubeRenderer.renderState(session.getState());
+    renderUi();
   });
 
   void installKeyboardControls(applyUserMove);
