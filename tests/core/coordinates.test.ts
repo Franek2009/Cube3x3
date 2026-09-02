@@ -41,6 +41,19 @@ function generateMoves(seed: number, length: number): Move[] {
   });
 }
 
+function edgePermutationWithSliceAt(positions: readonly number[]): Uint8Array {
+  const slicePositions = new Set(positions);
+  const permutation = new Uint8Array(12);
+  let udEdge = 0;
+  let sliceEdge = 8;
+
+  for (let position = 0; position < 12; position += 1) {
+    permutation[position] = slicePositions.has(position) ? sliceEdge++ : udEdge++;
+  }
+
+  return permutation;
+}
+
 describe('solver coordinates', () => {
   it('encodes every solved coordinate as zero', () => {
     const state = toSolverCubieState(solvedState());
@@ -99,6 +112,30 @@ describe('solver coordinates', () => {
     expect(seen.size).toBe(SLICE_COMBINATION_COUNT);
   });
 
+  it('independently encodes all 495 slice membership combinations', () => {
+    const coordinates = new Set<number>();
+
+    for (let p0 = 0; p0 < 9; p0 += 1) {
+      for (let p1 = p0 + 1; p1 < 10; p1 += 1) {
+        for (let p2 = p1 + 1; p2 < 11; p2 += 1) {
+          for (let p3 = p2 + 1; p3 < 12; p3 += 1) {
+            const edgePermutation = edgePermutationWithSliceAt([p0, p1, p2, p3]);
+            const coordinate = encodeSliceCombination(withComponent({ edgePermutation }));
+
+            expect(coordinate).toBeGreaterThanOrEqual(0);
+            expect(coordinate).toBeLessThan(SLICE_COMBINATION_COUNT);
+            coordinates.add(coordinate);
+          }
+        }
+      }
+    }
+
+    expect(coordinates.size).toBe(SLICE_COMBINATION_COUNT);
+    expect(encodeSliceCombination(withComponent({
+      edgePermutation: edgePermutationWithSliceAt([8, 9, 10, 11])
+    }))).toBe(0);
+  });
+
   it('round-trips every corner and UD-edge permutation', () => {
     for (let coordinate = 0; coordinate < CORNER_PERMUTATION_COUNT; coordinate += 1) {
       const cornerPermutation = decodeCornerPermutation(coordinate);
@@ -148,8 +185,34 @@ describe('solver coordinates', () => {
   it('rejects Phase 2 edge permutations outside the subgroup', () => {
     const state = toSolverCubieState(solvedState().applyMove('R'));
 
-    expect(() => encodeUdEdgePermutation(state)).toThrow('Phase 2 subgroup');
-    expect(() => encodeSliceEdgePermutation(state)).toThrow('Phase 2 subgroup');
+    expect(() => encodeUdEdgePermutation(state)).toThrow(
+      'UD-edge permutation requires slots 0..7 to contain each UD edge exactly once'
+    );
+    expect(() => encodeSliceEdgePermutation(state)).toThrow(
+      'Slice-edge permutation requires slots 8..11 to contain each slice edge exactly once'
+    );
+  });
+
+  it.each([
+    [0, 0, 1, 2, 3, 4, 5, 6],
+    [0, 1, 2, 3, 4, 5, 6, 6]
+  ])('rejects invalid UD-edge IDs %j', (...udEdges) => {
+    const edgePermutation = Uint8Array.from([...udEdges, 8, 9, 10, 11]);
+
+    expect(() => encodeUdEdgePermutation(withComponent({ edgePermutation }))).toThrow(
+      'UD-edge permutation requires slots 0..7 to contain each UD edge exactly once'
+    );
+  });
+
+  it.each([
+    [8, 8, 9, 10],
+    [8, 9, 10, 10]
+  ])('rejects invalid slice-edge IDs %j', (...sliceEdges) => {
+    const edgePermutation = Uint8Array.from([0, 1, 2, 3, 4, 5, 6, 7, ...sliceEdges]);
+
+    expect(() => encodeSliceEdgePermutation(withComponent({ edgePermutation }))).toThrow(
+      'Slice-edge permutation requires slots 8..11 to contain each slice edge exactly once'
+    );
   });
 
   it('rejects coordinates outside their ranges', () => {

@@ -41,6 +41,7 @@ export function encodeCornerOrientation(state: SolverCubieState): number {
   return coordinate;
 }
 
+/** Returns the corner-orientation component, not a complete cubie state. */
 export function decodeCornerOrientation(coordinate: number): Uint8Array {
   assertCoordinate(coordinate, CORNER_ORIENTATION_COUNT, 'corner orientation coordinate');
   const orientations = new Uint8Array(8);
@@ -66,6 +67,7 @@ export function encodeEdgeOrientation(state: SolverCubieState): number {
   return coordinate;
 }
 
+/** Returns the edge-orientation component, not a complete cubie state. */
 export function decodeEdgeOrientation(coordinate: number): Uint8Array {
   assertCoordinate(coordinate, EDGE_ORIENTATION_COUNT, 'edge orientation coordinate');
   const orientations = new Uint8Array(12);
@@ -107,6 +109,10 @@ export function encodeSliceCombination(state: SolverCubieState): number {
   return SLICE_COMBINATION_COUNT - 1 - rank;
 }
 
+/**
+ * Returns a canonical edge permutation with the requested slice membership.
+ * It does not guarantee global permutation parity relative to the corners.
+ */
 export function decodeSliceCombination(coordinate: number): Uint8Array {
   assertCoordinate(coordinate, SLICE_COMBINATION_COUNT, 'slice combination coordinate');
   let rank = SLICE_COMBINATION_COUNT - 1 - coordinate;
@@ -151,6 +157,21 @@ function encodePermutation(permutation: ArrayLike<number>): number {
   return rank;
 }
 
+function isExactPermutation(values: ArrayLike<number>, size: number): boolean {
+  if (values.length !== size) return false;
+  const seen = new Uint8Array(size);
+
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (!Number.isInteger(value) || value < 0 || value >= size || seen[value] === 1) {
+      return false;
+    }
+    seen[value] = 1;
+  }
+
+  return true;
+}
+
 function decodePermutation(coordinate: number, size: number, name: string): Uint8Array {
   const count = factorial(size);
   assertCoordinate(coordinate, count, name);
@@ -171,30 +192,37 @@ export function encodeCornerPermutation(state: SolverCubieState): number {
   return encodePermutation(state.cornerPermutation);
 }
 
+/** Returns only the eight-corner permutation component. */
 export function decodeCornerPermutation(coordinate: number): Uint8Array {
   return decodePermutation(coordinate, 8, 'corner permutation coordinate');
 }
 
 export function encodeUdEdgePermutation(state: SolverCubieState): number {
   const permutation = state.edgePermutation.slice(0, 8);
-  if (permutation.some((edge) => edge >= 8)) {
-    throw new Error('UD-edge permutation requires a Phase 2 subgroup state');
+  if (!isExactPermutation(permutation, 8)) {
+    throw new Error(
+      'UD-edge permutation requires slots 0..7 to contain each UD edge exactly once'
+    );
   }
   return encodePermutation(permutation);
 }
 
+/** Returns only the permutation component for UD-edge IDs 0..7. */
 export function decodeUdEdgePermutation(coordinate: number): Uint8Array {
   return decodePermutation(coordinate, 8, 'UD-edge permutation coordinate');
 }
 
 export function encodeSliceEdgePermutation(state: SolverCubieState): number {
   const permutation = Array.from(state.edgePermutation.slice(8), (edge) => edge - 8);
-  if (permutation.some((edge) => edge < 0 || edge >= 4)) {
-    throw new Error('Slice-edge permutation requires a Phase 2 subgroup state');
+  if (!isExactPermutation(permutation, 4)) {
+    throw new Error(
+      'Slice-edge permutation requires slots 8..11 to contain each slice edge exactly once'
+    );
   }
   return encodePermutation(permutation);
 }
 
+/** Returns only the permutation component for slice-edge IDs 8..11. */
 export function decodeSliceEdgePermutation(coordinate: number): Uint8Array {
   const permutation = decodePermutation(coordinate, 4, 'slice-edge permutation coordinate');
   return Uint8Array.from(permutation, (edge) => edge + 8);
