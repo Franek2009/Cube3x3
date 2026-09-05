@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { keyboardEventToMove } from '../../src/ui/keyboard.ts';
+import {
+  keyboardEventToAction,
+  keyboardEventToMove
+} from '../../src/ui/keyboard.ts';
 
 describe('keyboardEventToMove', () => {
   it.each([
@@ -50,5 +53,37 @@ describe('keyboardEventToMove', () => {
     ]);
 
     expect(mappedMoves.every((move) => move !== undefined && !move.endsWith('2'))).toBe(true);
+  });
+});
+
+describe('keyboardEventToAction', () => {
+  it.each([
+    ['x', false, 'x'],
+    ['y', false, 'y'],
+    ['z', false, 'z'],
+    ['x', true, "x'"],
+    ['Y', false, "y'"],
+    ['Z', true, "z'"]
+  ] as const)('maps %s with shift=%s to %s', (key, shift, action) => {
+    expect(keyboardEventToAction(key, shift)).toBe(action);
+  });
+
+  it('keeps face move mappings', () => {
+    expect(keyboardEventToAction('f', false)).toBe('F');
+    expect(keyboardEventToAction('F', false)).toBe("F'");
+  });
+
+  it.each(['1', '2', ' ', 'ArrowUp', 'Enter', 'Shift'])(
+    'ignores unsupported key %j',
+    (key) => expect(keyboardEventToAction(key, false)).toBeUndefined()
+  );
+
+  it('does not expose keyboard shortcuts for double rotations', () => {
+    const actions = ['x', 'y', 'z'].flatMap((key) => [
+      keyboardEventToAction(key, false),
+      keyboardEventToAction(key, true)
+    ]);
+
+    expect(actions.every((action) => action !== undefined && !action.endsWith('2'))).toBe(true);
   });
 });

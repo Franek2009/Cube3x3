@@ -400,6 +400,25 @@ button {
   height: 100%;
 }
 
+.viewport-guidance {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.orientation-indicator {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  color: #8f9db1;
+  font-size: 0.8rem;
+}
+
+.orientation-indicator strong {
+  color: #dce5f5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .status-grid {
   display: flex;
   gap: clamp(1.5rem, 5vw, 4rem);
@@ -487,11 +506,19 @@ button {
   text-align: right;
 }
 
-.move-grid {
+.move-grid,
+.rotation-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.65rem;
   margin-top: 1.25rem;
+}
+
+.move-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.rotation-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .move-button {
@@ -503,7 +530,7 @@ button {
 
 .history:empty::before {
   color: #718096;
-  content: "No user moves yet";
+  content: "No user actions yet";
 }
 
 .debug-state {

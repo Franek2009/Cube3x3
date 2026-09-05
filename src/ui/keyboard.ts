@@ -1,4 +1,6 @@
 import type { Move } from '../core/moves/moves.ts';
+import type { CubeRotation } from '../core/orientation/cubeOrientation.ts';
+import type { CubeAction } from './cubeAction.ts';
 
 const KEY_MOVES: Readonly<Record<string, Move>> = {
   u: 'U',
@@ -21,6 +23,20 @@ export function keyboardEventToMove(key: string, shiftKey: boolean): Move | unde
   return shiftKey || isUppercaseLetter ? `${baseMove}'` as Move : baseMove;
 }
 
+export function keyboardEventToAction(
+  key: string,
+  shiftKey: boolean
+): CubeAction | undefined {
+  const move = keyboardEventToMove(key, shiftKey);
+  if (move !== undefined) return move;
+
+  const axis = key.toLowerCase();
+  if (axis !== 'x' && axis !== 'y' && axis !== 'z') return undefined;
+
+  const isUppercaseLetter = key !== key.toLowerCase() && key === key.toUpperCase();
+  return shiftKey || isUppercaseLetter ? `${axis}'` as CubeRotation : axis;
+}
+
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -33,17 +49,17 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
-export function installKeyboardControls(onMove: (move: Move) => void): () => void {
+export function installKeyboardControls(onAction: (action: CubeAction) => void): () => void {
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (isEditableTarget(event.target)) {
       return;
     }
 
-    const move = keyboardEventToMove(event.key, event.shiftKey);
+    const action = keyboardEventToAction(event.key, event.shiftKey);
 
-    if (move !== undefined) {
+    if (action !== undefined) {
       event.preventDefault();
-      onMove(move);
+      onAction(action);
     }
   };
 

@@ -1,4 +1,13 @@
-import { ALL_MOVES, type Move } from '../core/moves/moves.ts';
+import { ALL_MOVES, isMove, type Move } from '../core/moves/moves.ts';
+import {
+  CUBE_ROTATIONS,
+  createDefaultCubeOrientation,
+  mapBaseMoveToUser,
+  mapUserMoveToBase,
+  rotateCubeOrientation,
+  type CubeOrientation,
+  type CubeRotation
+} from '../core/orientation/cubeOrientation.ts';
 import {
   analyzeSolution,
   SOLUTION_FACES,
@@ -26,6 +35,7 @@ import {
   type AnimationTransitionSettlement
 } from './animationTransition.ts';
 import { installKeyboardControls } from './keyboard.ts';
+import { formatCubeActions, type CubeAction } from './cubeAction.ts';
 import { SolveCommandController } from './SolveCommandController.ts';
 import {
   SolutionPlaybackController,
@@ -46,11 +56,23 @@ function getRequiredElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
-interface MoveTransition extends AnimationTransitionSettlement {
+interface FaceTransition extends AnimationTransitionSettlement {
+  readonly kind: 'face';
   readonly move: Move;
   readonly fromState: ReturnType<CubeSession['getState']>;
   readonly toState: ReturnType<CubeSession['getState']>;
+  readonly orientation: CubeOrientation;
 }
+
+interface RotationTransition extends AnimationTransitionSettlement {
+  readonly kind: 'rotation';
+  readonly rotation: CubeRotation;
+  readonly state: ReturnType<CubeSession['getState']>;
+  readonly fromOrientation: CubeOrientation;
+  readonly toOrientation: CubeOrientation;
+}
+
+type VisualTransition = FaceTransition | RotationTransition;
 
 export function initializeApp(): void {
   const session = new CubeSession();
@@ -81,8 +103,11 @@ export function initializeApp(): void {
   const solveCountElement = getRequiredElement<HTMLElement>('solve-count');
   const recentSolvesElement = getRequiredElement<HTMLOListElement>('recent-solves');
   const historyElement = getRequiredElement<HTMLParagraphElement>('move-history');
+  const orientationFrontElement = getRequiredElement<HTMLElement>('orientation-front');
+  const orientationUpElement = getRequiredElement<HTMLElement>('orientation-up');
   const debugElement = getRequiredElement<HTMLPreElement>('debug-state');
   const controlsElement = getRequiredElement<HTMLDivElement>('move-controls');
+  const rotationControlsElement = getRequiredElement<HTMLDivElement>('rotation-controls');
   const newScrambleButton = getRequiredElement<HTMLButtonElement>('new-scramble');
   const resetButton = getRequiredElement<HTMLButtonElement>('reset-cube');
   const solveButton = getRequiredElement<HTMLButtonElement>('solve-cube');
@@ -109,13 +134,16 @@ export function initializeApp(): void {
   const rendererContainer = getRequiredElement<HTMLDivElement>('cube-viewport');
   const cubeRenderer = new CubeRenderer(rendererContainer);
   let currentScramble: Move[] = [];
-  const animationQueue: MoveTransition[] = [];
-  let activeTransition: MoveTransition | undefined;
+  let cubeOrientation = createDefaultCubeOrientation();
+  const userActionHistory: CubeAction[] = [];
+  const animationQueue: VisualTransition[] = [];
+  let activeTransition: VisualTransition | undefined;
   let processingAnimations = false;
   let sessionGeneration = 0;
   let timerFrameId: number | undefined;
   let solverUiState: SolverUiState = 'preparing';
   let playbackState: SolutionPlaybackState = 'idle';
+  let solutionOrientation = cubeOrientation;
 
   const timerStatusLabels: Readonly<Record<SolveTimerState, string>> = {
     idle: 'Idle',
@@ -173,9 +201,12 @@ export function initializeApp(): void {
       if (result.depth === 0) {
         solutionSummaryElement.textContent = 'Cube is already solved.';
       } else {
-        const analysis = analyzeSolution(result.moves);
+        const userMoves = result.moves.map((move) => (
+          mapBaseMoveToUser(solutionOrientation, move)
+        ));
+        const analysis = analyzeSolution(userMoves);
         solutionSummaryElement.textContent = `Solution · ${result.depth} ${result.depth === 1 ? 'move' : 'moves'}`;
-        solutionMovesElement.textContent = result.moves.join(' ');
+        solutionMovesElement.textContent = userMoves.join(' ');
         solutionMovesElement.hidden = false;
         analysisHtmElement.textContent = `${analysis.htm} HTM`;
         analysisQtmElement.textContent = `${analysis.qtm} QTM`;
@@ -261,11 +292,15 @@ export function initializeApp(): void {
       : 'No scramble applied';
     solvedElement.textContent = session.isSolved() ? 'Yes' : 'No';
     moveCountElement.textContent = String(history.length);
-    historyElement.textContent = history.join(' ');
+    historyElement.textContent = formatCubeActions(userActionHistory);
+    orientationFrontElement.textContent = cubeOrientation.userToBase.F;
+    orientationUpElement.textContent = cubeOrientation.userToBase.U;
     renderTimer(now);
     debugElement.textContent = [
       `Solved: ${session.isSolved() ? 'yes' : 'no'}`,
       `Moves: ${history.length}`,
+      `Front: ${cubeOrientation.userToBase.F}`,
+      `Up: ${cubeOrientation.userToBase.U}`,
       '',
       `Corner permutation: [${state.cornerPermutation.join(', ')}]`,
       `Corner orientation: [${state.cornerOrientation.join(', ')}]`,
@@ -285,10 +320,27 @@ export function initializeApp(): void {
   const enqueueAnimation = (
     move: Move,
     fromState: ReturnType<CubeSession['getState']>,
-    toState: ReturnType<CubeSession['getState']>
+    toState: ReturnType<CubeSession['getState']>,
+    orientation: CubeOrientation
   ): Promise<void> => {
     const settlement = createAnimationTransitionSettlement();
-    animationQueue.push({ move, fromState, toState, ...settlement });
+    animationQueue.push({
+      kind: 'face', move, fromState, toState, orientation, ...settlement
+    });
+    void processAnimationQueue();
+    return settlement.promise;
+  };
+
+  const enqueueRotationAnimation = (
+    rotation: CubeRotation,
+    state: ReturnType<CubeSession['getState']>,
+    fromOrientation: CubeOrientation,
+    toOrientation: CubeOrientation
+  ): Promise<void> => {
+    const settlement = createAnimationTransitionSettlement();
+    animationQueue.push({
+      kind: 'rotation', rotation, state, fromOrientation, toOrientation, ...settlement
+    });
     void processAnimationQueue();
     return settlement.promise;
   };
@@ -305,11 +357,21 @@ export function initializeApp(): void {
         activeTransition = transition;
 
         try {
-          await cubeRenderer.animateMove(
-            transition.move,
-            transition.fromState,
-            transition.toState
-          );
+          if (transition.kind === 'face') {
+            await cubeRenderer.animateMove(
+              transition.move,
+              transition.fromState,
+              transition.toState,
+              transition.orientation
+            );
+          } else {
+            await cubeRenderer.animateRotation(
+              transition.state,
+              transition.rotation,
+              transition.fromOrientation,
+              transition.toOrientation
+            );
+          }
           transition.complete();
         } catch (error) {
           transition.fail(error);
@@ -331,7 +393,7 @@ export function initializeApp(): void {
       const toState = session.applyMove(move, { recordHistory: false });
       solveController.invalidateCubeState();
       renderUi();
-      await enqueueAnimation(move, fromState, toState);
+      await enqueueAnimation(move, fromState, toState, cubeOrientation);
     },
     onStateChange: (state) => {
       playbackState = state;
@@ -361,19 +423,22 @@ export function initializeApp(): void {
     }
   });
 
-  const applyUserMove = (move: Move): void => {
+  const applyUserMove = (userMove: Move): void => {
     playbackController.cancel();
     playbackStatusElement.textContent = '';
     playbackStatusElement.dataset.state = 'idle';
     const now = performance.now();
     const fromState = session.getState();
+    const orientation = cubeOrientation;
+    const baseMove = mapUserMoveToBase(orientation, userMove);
 
     if (timer.getState() === 'ready') {
       timer.start(now);
       startTimerUpdates();
     }
 
-    const toState = session.applyMove(move);
+    const toState = session.applyMove(baseMove);
+    userActionHistory.push(userMove);
     solveController.invalidateCubeState();
 
     if (session.isSolved() && timer.getState() === 'running') {
@@ -392,10 +457,42 @@ export function initializeApp(): void {
     }
 
     renderUi(now);
-    void enqueueAnimation(move, fromState, toState).catch((error) => {
+    void enqueueAnimation(baseMove, fromState, toState, orientation).catch((error) => {
       if (error instanceof AnimationTransitionCancelledError) return;
       console.error('Cube move animation failed', error);
     });
+  };
+
+  const applyUserRotation = (rotation: CubeRotation): void => {
+    playbackController.cancel();
+    playbackStatusElement.textContent = '';
+    playbackStatusElement.dataset.state = 'idle';
+    const fromOrientation = cubeOrientation;
+    const toOrientation = rotateCubeOrientation(fromOrientation, rotation);
+    const state = session.getState();
+
+    cubeOrientation = toOrientation;
+    userActionHistory.push(rotation);
+    solveController.invalidateCubeState();
+    renderUi();
+
+    void enqueueRotationAnimation(
+      rotation,
+      state,
+      fromOrientation,
+      toOrientation
+    ).catch((error) => {
+      if (error instanceof AnimationTransitionCancelledError) return;
+      console.error('Cube rotation animation failed', error);
+    });
+  };
+
+  const applyUserAction = (action: CubeAction): void => {
+    if (isMove(action)) {
+      applyUserMove(action);
+    } else {
+      applyUserRotation(action);
+    }
   };
 
   for (const move of ALL_MOVES) {
@@ -408,6 +505,16 @@ export function initializeApp(): void {
     controlsElement.append(button);
   }
 
+  for (const rotation of CUBE_ROTATIONS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'move-button';
+    button.textContent = rotation;
+    button.setAttribute('aria-label', `Apply ${rotation} cube rotation`);
+    button.addEventListener('click', () => applyUserRotation(rotation));
+    rotationControlsElement.append(button);
+  }
+
   const applyNewScramble = (): void => {
     playbackController.cancel();
     playbackStatusElement.textContent = '';
@@ -417,16 +524,19 @@ export function initializeApp(): void {
     cancelTimerFrame();
     timer.prepare();
     session.reset();
+    cubeOrientation = createDefaultCubeOrientation();
+    userActionHistory.length = 0;
     currentScramble = generateScramble(25);
     session.applyScramble(currentScramble);
     solveController.invalidateCubeState();
-    cubeRenderer.renderState(session.getState());
+    cubeRenderer.renderState(session.getState(), cubeOrientation);
     renderUi();
   };
 
   newScrambleButton.addEventListener('click', applyNewScramble);
   solveButton.addEventListener('click', () => {
     const snapshot = session.getState();
+    solutionOrientation = cubeOrientation;
     void solveController.solve(snapshot);
   });
   playSolutionButton.addEventListener('click', () => {
@@ -446,9 +556,11 @@ export function initializeApp(): void {
     cancelTimerFrame();
     timer.reset();
     session.reset();
+    cubeOrientation = createDefaultCubeOrientation();
+    userActionHistory.length = 0;
     solveController.invalidateCubeState();
     currentScramble = [];
-    cubeRenderer.renderState(session.getState());
+    cubeRenderer.renderState(session.getState(), cubeOrientation);
     renderUi();
   });
   clearHistoryButton.addEventListener('click', () => {
@@ -459,7 +571,7 @@ export function initializeApp(): void {
     renderStatistics();
   });
 
-  void installKeyboardControls(applyUserMove);
+  void installKeyboardControls(applyUserAction);
 
   renderStatistics();
   applyNewScramble();

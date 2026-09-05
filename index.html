@@ -27,9 +27,16 @@
             <p class="eyebrow">Live state</p>
             <h2 id="cube-heading">3D cube</h2>
           </div>
-          <p class="keyboard-hint">Static renderer · moves update instantly</p>
+          <div class="viewport-guidance">
+            <p class="keyboard-hint">View: drag to orbit</p>
+            <p class="keyboard-hint">Cube: x / y / z to reorient</p>
+          </div>
         </div>
         <div id="cube-viewport" class="cube-viewport"></div>
+        <div class="orientation-indicator" aria-label="Cube orientation">
+          <span>Front: <strong id="orientation-front">F</strong></span>
+          <span>Up: <strong id="orientation-up">U</strong></span>
+        </div>
       </section>
 
       <section id="timer-panel" class="panel timer-panel" data-state="idle" aria-labelledby="timer-heading">
@@ -149,11 +156,22 @@
         <div id="move-controls" class="move-grid" aria-label="Cube moves"></div>
       </section>
 
+      <section class="panel" aria-labelledby="rotation-controls-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Reorient cube</p>
+            <h2 id="rotation-controls-heading">Cube rotations</h2>
+          </div>
+          <p class="keyboard-hint">Keys X Y Z · hold Shift for prime · buttons for double</p>
+        </div>
+        <div id="rotation-controls" class="rotation-grid" aria-label="Whole-cube rotations"></div>
+      </section>
+
       <section class="panel" aria-labelledby="history-heading">
         <div class="section-heading">
           <div>
             <p class="eyebrow">User input only</p>
-            <h2 id="history-heading">Move history</h2>
+            <h2 id="history-heading">Action history</h2>
           </div>
         </div>
         <p id="move-history" class="history" aria-live="polite"></p>

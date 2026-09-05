@@ -3,8 +3,17 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { solvedState, type CubeState } from '../core/cube/CubeState.ts';
 import type { Move } from '../core/moves/moves.ts';
+import {
+  createDefaultCubeOrientation,
+  type CubeOrientation,
+  type CubeRotation
+} from '../core/orientation/cubeOrientation.ts';
 import { mapCubeStateToCubies, type CubieRenderData, type Face } from './cubieMapping.ts';
 import { getAffectedCubieIds, getMoveAnimationSpec } from './moveAnimation.ts';
+import {
+  cubeOrientationToQuaternion,
+  getCubeRotationAnimationSpec
+} from './orientationAnimation.ts';
 
 const FACE_COLORS: Readonly<Record<Face, number>> = {
   U: 0xffffff, D: 0xffd500, F: 0x19a55a, B: 0x2563eb, R: 0xdc2626, L: 0xf97316
@@ -16,8 +25,7 @@ type CubieMesh = THREE.Mesh<THREE.BoxGeometry, THREE.MeshStandardMaterial[]>;
 
 interface ActiveAnimation {
   frameId: number;
-  readonly pivot: THREE.Group;
-  readonly meshes: readonly CubieMesh[];
+  readonly cleanup: () => void;
   readonly resolve: () => void;
 }
 
@@ -66,22 +74,30 @@ export class CubeRenderer {
 
     this.#createMeshes();
     this.#syncState(solvedState());
+    this.#syncOrientation(createDefaultCubeOrientation());
     this.#resizeObserver = new ResizeObserver(() => this.resize());
     this.#resizeObserver.observe(this.#container);
     this.resize();
   }
 
-  renderState(state: CubeState): void {
+  renderState(state: CubeState, orientation: CubeOrientation): void {
     this.#assertUsable();
     this.#cancelActiveAnimation();
     this.#syncState(state);
+    this.#syncOrientation(orientation);
     this.#render();
   }
 
-  animateMove(move: Move, fromState: CubeState, toState: CubeState): Promise<void> {
+  animateMove(
+    move: Move,
+    fromState: CubeState,
+    toState: CubeState,
+    orientation: CubeOrientation
+  ): Promise<void> {
     this.#assertUsable();
     this.#cancelActiveAnimation();
     this.#syncState(fromState);
+    this.#syncOrientation(orientation);
 
     const spec = getMoveAnimationSpec(move);
     const meshes = getAffectedCubieIds(move, fromState).map((id) => this.#getMesh(id));
@@ -94,7 +110,11 @@ export class CubeRenderer {
 
     return new Promise((resolve) => {
       const startedAt = performance.now();
-      const animation: ActiveAnimation = { frameId: 0, pivot, meshes, resolve };
+      const animation: ActiveAnimation = {
+        frameId: 0,
+        cleanup: () => this.#reparentAnimatedMeshes(pivot, meshes),
+        resolve
+      };
       this.#activeAnimation = animation;
 
       const step = (timestamp: number): void => {
@@ -108,7 +128,57 @@ export class CubeRenderer {
         if (progress < 1) {
           animation.frameId = requestAnimationFrame(step);
         } else {
-          this.#completeAnimation(animation, toState);
+          this.#completeAnimation(animation, () => this.#syncState(toState));
+        }
+      };
+
+      animation.frameId = requestAnimationFrame(step);
+    });
+  }
+
+  animateRotation(
+    state: CubeState,
+    rotation: CubeRotation,
+    fromOrientation: CubeOrientation,
+    toOrientation: CubeOrientation
+  ): Promise<void> {
+    this.#assertUsable();
+    this.#cancelActiveAnimation();
+    this.#syncState(state);
+
+    const spec = getCubeRotationAnimationSpec(rotation);
+    const start = cubeOrientationToQuaternion(fromOrientation);
+    const localDelta = new THREE.Quaternion().setFromAxisAngle(
+      spec.axis === 'x'
+        ? new THREE.Vector3(1, 0, 0)
+        : spec.axis === 'y'
+          ? new THREE.Vector3(0, 1, 0)
+          : new THREE.Vector3(0, 0, 1),
+      spec.angle
+    );
+    const animationTarget = localDelta.multiply(start).normalize();
+    const exactTarget = cubeOrientationToQuaternion(toOrientation);
+    this.#cubeGroup.quaternion.copy(start);
+
+    return new Promise((resolve) => {
+      const startedAt = performance.now();
+      const animation: ActiveAnimation = { frameId: 0, cleanup: () => undefined, resolve };
+      this.#activeAnimation = animation;
+
+      const step = (timestamp: number): void => {
+        if (this.#activeAnimation !== animation) return;
+
+        const progress = Math.min((timestamp - startedAt) / spec.durationMs, 1);
+        const eased = progress * progress * (3 - 2 * progress);
+        this.#cubeGroup.quaternion.slerpQuaternions(start, animationTarget, eased);
+        this.#render();
+
+        if (progress < 1) {
+          animation.frameId = requestAnimationFrame(step);
+        } else {
+          this.#completeAnimation(animation, () => {
+            this.#cubeGroup.quaternion.copy(exactTarget);
+          });
         }
       };
 
@@ -164,6 +234,10 @@ export class CubeRenderer {
     }
   }
 
+  #syncOrientation(orientation: CubeOrientation): void {
+    this.#cubeGroup.quaternion.copy(cubeOrientationToQuaternion(orientation));
+  }
+
   #updateMaterials(mesh: CubieMesh, cubie: CubieRenderData): void {
     const stickers = new Map(cubie.stickers.map((sticker) => [sticker.direction, sticker.face]));
     MATERIAL_DIRECTIONS.forEach((direction, index) => {
@@ -178,11 +252,11 @@ export class CubeRenderer {
     return mesh;
   }
 
-  #completeAnimation(animation: ActiveAnimation, state: CubeState): void {
+  #completeAnimation(animation: ActiveAnimation, syncFinal: () => void): void {
     if (this.#activeAnimation !== animation) return;
-    this.#reparentAnimatedMeshes(animation);
+    animation.cleanup();
     this.#activeAnimation = undefined;
-    this.#syncState(state);
+    syncFinal();
     this.#render();
     animation.resolve();
   }
@@ -191,15 +265,15 @@ export class CubeRenderer {
     const animation = this.#activeAnimation;
     if (animation === undefined) return;
     cancelAnimationFrame(animation.frameId);
-    this.#reparentAnimatedMeshes(animation);
+    animation.cleanup();
     this.#activeAnimation = undefined;
     animation.resolve();
   }
 
-  #reparentAnimatedMeshes(animation: ActiveAnimation): void {
-    animation.pivot.updateMatrixWorld(true);
-    for (const mesh of animation.meshes) this.#cubeGroup.attach(mesh);
-    this.#cubeGroup.remove(animation.pivot);
+  #reparentAnimatedMeshes(pivot: THREE.Group, meshes: readonly CubieMesh[]): void {
+    pivot.updateMatrixWorld(true);
+    for (const mesh of meshes) this.#cubeGroup.attach(mesh);
+    this.#cubeGroup.remove(pivot);
   }
 
   #render(): void {
