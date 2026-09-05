@@ -607,6 +607,48 @@ button {
   font-size: 0.82rem;
 }
 
+.satisfaction-room {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  justify-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  padding: clamp(1rem, 4vw, 2.5rem);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(72, 103, 178, 0.22), transparent 40rem),
+    #070b11;
+}
+
+.satisfaction-room__stage {
+  align-self: stretch;
+  width: min(100%, 70rem);
+  min-height: 0;
+}
+
+.satisfaction-room__stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.satisfaction-room__status {
+  margin: 0;
+  color: #dce5f5;
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.satisfaction-room__exit {
+  margin: 0.65rem 0 0;
+  color: #718096;
+  font-size: 0.8rem;
+}
+
 .move-button {
   min-height: 3.25rem;
   padding: 0.7rem;

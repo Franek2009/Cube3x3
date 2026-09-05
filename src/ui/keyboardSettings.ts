@@ -20,6 +20,7 @@ export interface KeyboardSettingsDependencies {
 
 export interface KeyboardSettingsController {
   readonly isCapturing: () => boolean;
+  readonly cancelCapture: () => void;
   readonly dispose: () => void;
 }
 
@@ -180,6 +181,12 @@ export function createKeyboardSettingsController(
 
   return {
     isCapturing: () => capturingAction !== undefined,
+    cancelCapture: () => {
+      if (capturingAction === undefined) return;
+      capturingAction = undefined;
+      status = 'Binding change cancelled.';
+      render();
+    },
     dispose: () => {
       if (disposed) return;
       disposed = true;

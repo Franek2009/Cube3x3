@@ -44,6 +44,9 @@ import {
   saveKeybindings
 } from './keybindingStorage.ts';
 import { createKeyboardSettingsController } from './keyboardSettings.ts';
+import { SatisfactionRoomController } from './satisfactionRoom/SatisfactionRoomController.ts';
+import { prepareNormalAppForSatisfactionRoom } from './satisfactionRoom/prepareNormalAppForSatisfactionRoom.ts';
+import { installSatisfactionRoomShortcut } from './satisfactionRoom/satisfactionRoomShortcut.ts';
 import { SolveCommandController } from './SolveCommandController.ts';
 import {
   SolutionPlaybackController,
@@ -588,21 +591,48 @@ export function initializeApp(): void {
     keyboardSettingsElement,
     keyboardSettingsToggle,
     {
-    initialBindings: keybindings,
-    onBindingsChange: (next) => {
-      keybindings = next;
-      if (solveStorage !== undefined) saveKeybindings(solveStorage, next);
-    },
-    onResetDefaults: (defaults) => {
-      keybindings = defaults;
-      if (solveStorage !== undefined) clearStoredKeybindings(solveStorage);
-    }
+      initialBindings: keybindings,
+      onBindingsChange: (next) => {
+        keybindings = next;
+        if (solveStorage !== undefined) saveKeybindings(solveStorage, next);
+      },
+      onResetDefaults: (defaults) => {
+        keybindings = defaults;
+        if (solveStorage !== undefined) clearStoredKeybindings(solveStorage);
+      }
     }
   );
   const removeKeyboardControls = installKeyboardControls({
     getBindings: () => keybindings,
     isCaptureActive: keyboardSettings.isCapturing,
     onAction: applyUserAction
+  });
+  const satisfactionRoom = new SatisfactionRoomController();
+  const removeSatisfactionRoomShortcut = installSatisfactionRoomShortcut({
+    isRoomOpen: () => satisfactionRoom.isOpen(),
+    toggleRoom: () => {
+      if (!satisfactionRoom.isOpen()) {
+        keyboardSettings.cancelCapture();
+        prepareNormalAppForSatisfactionRoom({
+          cancelPlayback: () => {
+            playbackController.cancel();
+            playbackStatusElement.textContent = '';
+            playbackStatusElement.dataset.state = 'idle';
+          },
+          cancelVisualTransitions: () => {
+            clearAnimationQueue();
+            sessionGeneration += 1;
+          },
+          invalidateSolver: () => solveController.invalidateCubeState(),
+          synchronizeRenderer: () => cubeRenderer.renderState(
+            session.getState(),
+            cubeOrientation
+          )
+        });
+      }
+      satisfactionRoom.toggle();
+    },
+    closeRoom: () => satisfactionRoom.close()
   });
   const removeCubeDragControls = installCubeDragControls(
     cubeRenderer.getInteractionElement(),
@@ -611,8 +641,10 @@ export function initializeApp(): void {
   window.addEventListener('pagehide', (event) => {
     if (event.persisted) return;
     removeKeyboardControls();
+    removeSatisfactionRoomShortcut();
     removeCubeDragControls();
     keyboardSettings.dispose();
+    satisfactionRoom.dispose();
   }, { once: true });
 
   renderStatistics();
