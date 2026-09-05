@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { solvedState, type CubeState } from '../core/cube/CubeState.ts';
 import type { Move } from '../core/moves/moves.ts';
@@ -25,12 +26,14 @@ export class CubeRenderer {
   readonly #scene = new THREE.Scene();
   readonly #camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
   readonly #renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  readonly #controls: OrbitControls;
   readonly #cubeGroup = new THREE.Group();
   readonly #geometry = new THREE.BoxGeometry(0.92, 0.92, 0.92);
   readonly #resizeObserver: ResizeObserver;
   readonly #meshes = new Map<string, CubieMesh>();
   #activeAnimation: ActiveAnimation | undefined;
   #disposed = false;
+  readonly #renderOnControlsChange = (): void => this.#render();
 
   constructor(container: HTMLElement) {
     this.#container = container;
@@ -40,8 +43,22 @@ export class CubeRenderer {
     this.#container.append(this.#renderer.domElement);
     this.#camera.position.set(5.6, 4.5, 6.5);
     this.#camera.lookAt(0, 0, 0);
+    this.#controls = new OrbitControls(this.#camera, this.#renderer.domElement);
+    this.#controls.target.set(0, 0, 0);
+    this.#controls.enableRotate = true;
+    this.#controls.enableZoom = true;
+    this.#controls.enablePan = false;
+    this.#controls.enableDamping = false;
+    this.#controls.minDistance = 9;
+    this.#controls.maxDistance = 16;
+    this.#controls.minPolarAngle = 0.05;
+    this.#controls.maxPolarAngle = Math.PI - 0.05;
+    this.#controls.cursorStyle = 'grab';
+    this.#controls.update();
+    this.#controls.addEventListener('change', this.#renderOnControlsChange);
     this.#scene.add(this.#cubeGroup);
-    this.#scene.add(new THREE.HemisphereLight(0xffffff, 0x243047, 2.2));
+    this.#scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+    this.#scene.add(new THREE.HemisphereLight(0xffffff, 0x40506a, 1.2));
 
     const keyLight = new THREE.DirectionalLight(0xffffff, 3.2);
     keyLight.position.set(4, 7, 5);
@@ -112,6 +129,8 @@ export class CubeRenderer {
   dispose(): void {
     if (this.#disposed) return;
     this.#cancelActiveAnimation();
+    this.#controls.removeEventListener('change', this.#renderOnControlsChange);
+    this.#controls.dispose();
     this.#disposed = true;
     this.#resizeObserver.disconnect();
     for (const mesh of this.#meshes.values()) {
