@@ -1,4 +1,9 @@
 import { ALL_MOVES, type Move } from '../core/moves/moves.ts';
+import {
+  analyzeSolution,
+  SOLUTION_FACES,
+  type SolutionFace
+} from '../core/analysis/solutionAnalysis.ts';
 import { SolveHistory } from '../core/results/SolveResults.ts';
 import {
   clearSolveRecords,
@@ -86,6 +91,20 @@ export function initializeApp(): void {
   const solutionOutputElement = getRequiredElement<HTMLElement>('solution-output');
   const solutionSummaryElement = getRequiredElement<HTMLParagraphElement>('solution-summary');
   const solutionMovesElement = getRequiredElement<HTMLParagraphElement>('solution-moves');
+  const solutionAnalysisElement = getRequiredElement<HTMLElement>('solution-analysis');
+  const analysisHtmElement = getRequiredElement<HTMLElement>('analysis-htm');
+  const analysisQtmElement = getRequiredElement<HTMLElement>('analysis-qtm');
+  const analysisQuarterTurnsElement = getRequiredElement<HTMLElement>('analysis-quarter-turns');
+  const analysisHalfTurnsElement = getRequiredElement<HTMLElement>('analysis-half-turns');
+  const analysisScrambleLengthElement = getRequiredElement<HTMLElement>('analysis-scramble-length');
+  const analysisFaceElements: Readonly<Record<SolutionFace, HTMLElement>> = {
+    U: getRequiredElement<HTMLElement>('analysis-face-u'),
+    D: getRequiredElement<HTMLElement>('analysis-face-d'),
+    L: getRequiredElement<HTMLElement>('analysis-face-l'),
+    R: getRequiredElement<HTMLElement>('analysis-face-r'),
+    F: getRequiredElement<HTMLElement>('analysis-face-f'),
+    B: getRequiredElement<HTMLElement>('analysis-face-b')
+  };
   const playbackStatusElement = getRequiredElement<HTMLElement>('playback-status');
   const rendererContainer = getRequiredElement<HTMLDivElement>('cube-viewport');
   const cubeRenderer = new CubeRenderer(rendererContainer);
@@ -135,6 +154,8 @@ export function initializeApp(): void {
   };
 
   const renderSolution = (result: Awaited<ReturnType<SolverClient['solve']>> | undefined): void => {
+    solutionAnalysisElement.hidden = true;
+
     if (result === undefined) {
       solutionOutputElement.hidden = true;
       solutionSummaryElement.textContent = '';
@@ -152,9 +173,19 @@ export function initializeApp(): void {
       if (result.depth === 0) {
         solutionSummaryElement.textContent = 'Cube is already solved.';
       } else {
+        const analysis = analyzeSolution(result.moves);
         solutionSummaryElement.textContent = `Solution · ${result.depth} ${result.depth === 1 ? 'move' : 'moves'}`;
         solutionMovesElement.textContent = result.moves.join(' ');
         solutionMovesElement.hidden = false;
+        analysisHtmElement.textContent = `${analysis.htm} HTM`;
+        analysisQtmElement.textContent = `${analysis.qtm} QTM`;
+        analysisQuarterTurnsElement.textContent = String(analysis.quarterTurns);
+        analysisHalfTurnsElement.textContent = String(analysis.halfTurns);
+        analysisScrambleLengthElement.textContent = `${currentScramble.length} HTM`;
+        for (const face of SOLUTION_FACES) {
+          analysisFaceElements[face].textContent = String(analysis.faceUsage[face]);
+        }
+        solutionAnalysisElement.hidden = false;
       }
     } else if (result.reason === 'depth-limit') {
       solutionSummaryElement.textContent = 'No solution found within the depth limit.';

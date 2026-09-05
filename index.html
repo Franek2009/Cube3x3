@@ -67,6 +67,30 @@
         >
           <p id="solution-summary" class="solution-summary"></p>
           <p id="solution-moves" class="solution-moves"></p>
+          <section
+            id="solution-analysis"
+            class="solution-analysis"
+            aria-labelledby="solution-analysis-heading"
+            hidden
+          >
+            <h3 id="solution-analysis-heading">Solution analysis</h3>
+            <dl class="solution-metrics">
+              <div><dt>Moves (HTM)</dt><dd id="analysis-htm"></dd></div>
+              <div><dt>Quarter-turn metric (QTM)</dt><dd id="analysis-qtm"></dd></div>
+              <div><dt>Quarter turns</dt><dd id="analysis-quarter-turns"></dd></div>
+              <div><dt>Half turns</dt><dd id="analysis-half-turns"></dd></div>
+              <div><dt>Scramble length</dt><dd id="analysis-scramble-length"></dd></div>
+            </dl>
+            <h4>Face usage</h4>
+            <dl class="face-usage">
+              <div><dt>U</dt><dd id="analysis-face-u"></dd></div>
+              <div><dt>D</dt><dd id="analysis-face-d"></dd></div>
+              <div><dt>L</dt><dd id="analysis-face-l"></dd></div>
+              <div><dt>R</dt><dd id="analysis-face-r"></dd></div>
+              <div><dt>F</dt><dd id="analysis-face-f"></dd></div>
+              <div><dt>B</dt><dd id="analysis-face-b"></dd></div>
+            </dl>
+          </section>
         </div>
         <div class="solution-controls">
           <button id="play-solution" class="button" type="button" disabled>

@@ -293,6 +293,65 @@ button {
   word-spacing: 0.2em;
 }
 
+.solution-analysis {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #273449;
+}
+
+.solution-analysis h3,
+.solution-analysis h4 {
+  margin: 0;
+  color: #aab8cc;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.solution-analysis h4 {
+  margin-top: 1rem;
+}
+
+.solution-metrics,
+.face-usage {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.65rem 0 0;
+}
+
+.solution-metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.face-usage {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.solution-metrics div,
+.face-usage div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid #273449;
+  border-radius: 0.55rem;
+  background: rgba(9, 14, 21, 0.45);
+}
+
+.solution-metrics dt,
+.face-usage dt {
+  color: #8190a4;
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.solution-metrics dd,
+.face-usage dd {
+  margin: 0;
+  color: #e1e9f7;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 .solution-controls {
   display: flex;
   align-items: center;
@@ -509,6 +568,14 @@ button {
 
   .statistics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .solution-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .face-usage {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .keyboard-hint {
