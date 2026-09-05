@@ -36,6 +36,7 @@ import {
 } from './animationTransition.ts';
 import { installKeyboardControls } from './keyboard.ts';
 import { formatCubeActions, type CubeAction } from './cubeAction.ts';
+import { installCubeDragControls } from './cubeDragControls.ts';
 import { SolveCommandController } from './SolveCommandController.ts';
 import {
   SolutionPlaybackController,
@@ -571,7 +572,16 @@ export function initializeApp(): void {
     renderStatistics();
   });
 
-  void installKeyboardControls(applyUserAction);
+  const removeKeyboardControls = installKeyboardControls(applyUserAction);
+  const removeCubeDragControls = installCubeDragControls(
+    cubeRenderer.getInteractionElement(),
+    applyUserRotation
+  );
+  window.addEventListener('pagehide', (event) => {
+    if (event.persisted) return;
+    removeKeyboardControls();
+    removeCubeDragControls();
+  }, { once: true });
 
   renderStatistics();
   applyNewScramble();

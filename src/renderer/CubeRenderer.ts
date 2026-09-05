@@ -49,11 +49,11 @@ export class CubeRenderer {
     this.#renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.#renderer.domElement.setAttribute('aria-label', '3D Rubik cube view');
     this.#container.append(this.#renderer.domElement);
-    this.#camera.position.set(5.6, 4.5, 6.5);
+    this.#camera.position.set(0, 2, 9);
     this.#camera.lookAt(0, 0, 0);
     this.#controls = new OrbitControls(this.#camera, this.#renderer.domElement);
     this.#controls.target.set(0, 0, 0);
-    this.#controls.enableRotate = true;
+    this.#controls.enableRotate = false;
     this.#controls.enableZoom = true;
     this.#controls.enablePan = false;
     this.#controls.enableDamping = false;
@@ -86,6 +86,10 @@ export class CubeRenderer {
     this.#syncState(state);
     this.#syncOrientation(orientation);
     this.#render();
+  }
+
+  getInteractionElement(): HTMLCanvasElement {
+    return this.#renderer.domElement;
   }
 
   animateMove(
