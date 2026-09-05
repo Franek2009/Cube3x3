@@ -33,6 +33,33 @@ const validRecord: SolveRecord = {
 };
 
 describe('solve storage', () => {
+  it('returns an empty history when reading storage throws', () => {
+    const storage: KeyValueStorage = {
+      getItem: () => {
+        throw new Error('storage unavailable');
+      },
+      setItem: () => undefined,
+      removeItem: () => undefined
+    };
+
+    expect(loadSolveRecords(storage)).toEqual([]);
+  });
+
+  it('does not propagate storage write or removal failures', () => {
+    const storage: KeyValueStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('quota exceeded');
+      },
+      removeItem: () => {
+        throw new Error('storage unavailable');
+      }
+    };
+
+    expect(() => saveSolveRecords(storage, [validRecord])).not.toThrow();
+    expect(() => clearSolveRecords(storage)).not.toThrow();
+  });
+
   it('saves and loads typed solve records', () => {
     const storage = new FakeStorage();
 

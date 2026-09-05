@@ -1,7 +1,5 @@
-cat > .gitignore <<'EOF'
 node_modules/
 dist/
 coverage/
 *.log
 .DS_Store
-EOF
