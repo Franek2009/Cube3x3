@@ -1,21 +1,23 @@
 {
   "name": "cube3x3",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs",
-    "test": "tests"
-  },
+  "private": true,
+  "description": "Interactive 3x3 cube simulator, speedcubing timer, and Two-Phase solver.",
   "scripts": {
     "test": "vitest run",
     "dev": "vite",
     "build": "tsc && vite build",
+    "preview": "vite preview",
     "test:watch": "vitest"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Franek2009",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Franek2009/Cube3x3.git"
+  },
+  "homepage": "https://franek2009.github.io/Cube3x3/",
   "type": "module",
   "devDependencies": {
     "@types/three": "^0.185.4",
