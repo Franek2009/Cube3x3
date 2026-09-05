@@ -55,6 +55,10 @@ function eventError(event: WorkerErrorEvent, fallback: string): Error {
   return new Error(event.message ?? fallback);
 }
 
+function normalizeError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 function normalizeResult(result: SolveResult): SolveResult {
   if (result.solved) {
     return {
@@ -76,7 +80,7 @@ function normalizeResult(result: SolveResult): SolveResult {
 }
 
 export class SolverClient {
-  readonly #worker: WorkerLike;
+  readonly #worker: WorkerLike | undefined;
   readonly #pending = new Map<number, PendingRequest>();
   #nextRequestId = 1;
   #state: ClientState = 'active';
@@ -85,7 +89,14 @@ export class SolverClient {
   #workerTerminated = false;
 
   constructor(options: SolverClientOptions = {}) {
-    this.#worker = (options.workerFactory ?? createDefaultWorker)();
+    try {
+      this.#worker = (options.workerFactory ?? createDefaultWorker)();
+    } catch (error) {
+      this.#state = 'failed';
+      this.#terminalError = normalizeError(error);
+      return;
+    }
+
     this.#worker.onmessage = (event) => this.#handleMessage(event.data);
     this.#worker.onerror = (event) => {
       this.#fail(eventError(event, 'Solver worker crashed'));
@@ -135,10 +146,16 @@ export class SolverClient {
   }
 
   #post(request: SolverWorkerRequest): void {
+    const worker = this.#worker;
+    if (worker === undefined) {
+      this.#fail(new Error('Solver worker is unavailable'));
+      return;
+    }
+
     try {
-      this.#worker.postMessage(request);
+      worker.postMessage(request);
     } catch (error) {
-      this.#fail(error instanceof Error ? error : new Error(String(error)));
+      this.#fail(normalizeError(error));
     }
   }
 
@@ -227,6 +244,6 @@ export class SolverClient {
   #terminateWorker(): void {
     if (this.#workerTerminated) return;
     this.#workerTerminated = true;
-    this.#worker.terminate();
+    this.#worker?.terminate();
   }
 }

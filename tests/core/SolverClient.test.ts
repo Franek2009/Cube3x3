@@ -53,6 +53,34 @@ async function makeReady(client: SolverClient, worker: FakeWorker): Promise<void
 }
 
 describe('SolverClient', () => {
+  it('enters a terminal failed state when worker construction throws', async () => {
+    const constructionError = new Error('worker construction failed');
+    const client = new SolverClient({
+      workerFactory: () => {
+        throw constructionError;
+      }
+    });
+
+    await expect(client.prewarm()).rejects.toBe(constructionError);
+    await expect(client.solve(solvedState())).rejects.toBe(constructionError);
+    expect(() => {
+      client.dispose();
+      client.dispose();
+    }).not.toThrow();
+  });
+
+  it('normalizes non-Error worker construction failures', async () => {
+    const client = new SolverClient({
+      workerFactory: () => {
+        throw 'worker unavailable';
+      }
+    });
+
+    await expect(client.prewarm()).rejects.toThrow('worker unavailable');
+    await expect(client.solve(solvedState())).rejects.toThrow('worker unavailable');
+    expect(() => client.dispose()).not.toThrow();
+  });
+
   it('deduplicates prewarm and resolves on the correlated ready response', async () => {
     const { client, worker } = createClient();
     const first = client.prewarm();
