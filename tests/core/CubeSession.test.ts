@@ -48,6 +48,14 @@ describe('CubeSession', () => {
     expect(session.getMoveHistory()).toEqual(['R', "U'"]);
   });
 
+  it('applyMove can update state without recording user history', () => {
+    const session = new CubeSession();
+    const state = session.applyMove('R', { recordHistory: false });
+
+    expect(state.equals(solvedState().applyMove('R'))).toBe(true);
+    expect(session.getMoveHistory()).toEqual([]);
+  });
+
   it('applyMoves applies moves from left to right', () => {
     const session = new CubeSession();
     const state = session.applyMoves(['R', 'U', "R'"]);

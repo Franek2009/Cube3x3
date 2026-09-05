@@ -1,6 +1,10 @@
 import { solvedState, type CubeState } from '../cube/CubeState.ts';
 import type { Move } from '../moves/moves.ts';
 
+export interface ApplyMoveOptions {
+  readonly recordHistory?: boolean;
+}
+
 export class CubeSession {
   #state: CubeState;
   readonly #moveHistory: Move[] = [];
@@ -17,9 +21,11 @@ export class CubeSession {
     return [...this.#moveHistory];
   }
 
-  applyMove(move: Move): CubeState {
+  applyMove(move: Move, options: ApplyMoveOptions = {}): CubeState {
     this.#state = this.#state.applyMove(move);
-    this.#moveHistory.push(move);
+    if (options.recordHistory ?? true) {
+      this.#moveHistory.push(move);
+    }
 
     return this.#state;
   }

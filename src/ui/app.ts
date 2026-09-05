@@ -15,8 +15,17 @@ import {
   type SolveTimerState
 } from '../core/timer/SolveTimer.ts';
 import { CubeRenderer } from '../renderer/CubeRenderer.ts';
+import {
+  AnimationTransitionCancelledError,
+  createAnimationTransitionSettlement,
+  type AnimationTransitionSettlement
+} from './animationTransition.ts';
 import { installKeyboardControls } from './keyboard.ts';
 import { SolveCommandController } from './SolveCommandController.ts';
+import {
+  SolutionPlaybackController,
+  type SolutionPlaybackState
+} from './SolutionPlaybackController.ts';
 import {
   prewarmSolverForApp,
   type SolverUiState
@@ -32,7 +41,7 @@ function getRequiredElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
-interface MoveTransition {
+interface MoveTransition extends AnimationTransitionSettlement {
   readonly move: Move;
   readonly fromState: ReturnType<CubeSession['getState']>;
   readonly toState: ReturnType<CubeSession['getState']>;
@@ -72,17 +81,22 @@ export function initializeApp(): void {
   const newScrambleButton = getRequiredElement<HTMLButtonElement>('new-scramble');
   const resetButton = getRequiredElement<HTMLButtonElement>('reset-cube');
   const solveButton = getRequiredElement<HTMLButtonElement>('solve-cube');
+  const playSolutionButton = getRequiredElement<HTMLButtonElement>('play-solution');
   const clearHistoryButton = getRequiredElement<HTMLButtonElement>('clear-history');
   const solutionOutputElement = getRequiredElement<HTMLElement>('solution-output');
   const solutionSummaryElement = getRequiredElement<HTMLParagraphElement>('solution-summary');
   const solutionMovesElement = getRequiredElement<HTMLParagraphElement>('solution-moves');
+  const playbackStatusElement = getRequiredElement<HTMLElement>('playback-status');
   const rendererContainer = getRequiredElement<HTMLDivElement>('cube-viewport');
   const cubeRenderer = new CubeRenderer(rendererContainer);
   let currentScramble: Move[] = [];
   const animationQueue: MoveTransition[] = [];
+  let activeTransition: MoveTransition | undefined;
   let processingAnimations = false;
   let sessionGeneration = 0;
   let timerFrameId: number | undefined;
+  let solverUiState: SolverUiState = 'preparing';
+  let playbackState: SolutionPlaybackState = 'idle';
 
   const timerStatusLabels: Readonly<Record<SolveTimerState, string>> = {
     idle: 'Idle',
@@ -97,10 +111,27 @@ export function initializeApp(): void {
     error: 'Solver unavailable'
   };
 
+  let solveController: SolveCommandController;
+
+  const updateCommandButtons = (): void => {
+    const solution = solveController?.getCurrentSolution();
+    const playbackIdle = playbackState === 'idle';
+
+    solveButton.disabled = solverUiState !== 'ready' || !playbackIdle;
+    playSolutionButton.disabled = (
+      solverUiState !== 'ready' ||
+      !playbackIdle ||
+      timer.getState() === 'running' ||
+      solution === undefined ||
+      solution.length === 0
+    );
+  };
+
   const renderSolverStatus = (state: SolverUiState): void => {
+    solverUiState = state;
     solverStatusElement.dataset.state = state;
     solverStatusElement.textContent = solverStatusLabels[state];
-    solveButton.disabled = state !== 'ready';
+    updateCommandButtons();
   };
 
   const renderSolution = (result: Awaited<ReturnType<SolverClient['solve']>> | undefined): void => {
@@ -109,6 +140,7 @@ export function initializeApp(): void {
       solutionSummaryElement.textContent = '';
       solutionMovesElement.textContent = '';
       solutionMovesElement.hidden = true;
+      updateCommandButtons();
       return;
     }
 
@@ -129,9 +161,11 @@ export function initializeApp(): void {
     } else {
       solutionSummaryElement.textContent = 'The current cube state is invalid.';
     }
+
+    updateCommandButtons();
   };
 
-  const solveController = new SolveCommandController(solverClient, {
+  solveController = new SolveCommandController(solverClient, {
     onStateChange: renderSolverStatus,
     onResultChange: renderSolution,
     reportError: (error) => console.error('Solver solve failed', error)
@@ -141,6 +175,7 @@ export function initializeApp(): void {
     timerPanelElement.dataset.state = timer.getState();
     timerTimeElement.textContent = formatElapsedTime(timer.getElapsedMs(now));
     timerStatusElement.textContent = timerStatusLabels[timer.getState()];
+    updateCommandButtons();
   };
 
   const cancelTimerFrame = (): void => {
@@ -209,6 +244,24 @@ export function initializeApp(): void {
     ].join('\n');
   };
 
+  const clearAnimationQueue = (): void => {
+    activeTransition?.cancel();
+    for (const transition of animationQueue.splice(0)) {
+      transition.cancel();
+    }
+  };
+
+  const enqueueAnimation = (
+    move: Move,
+    fromState: ReturnType<CubeSession['getState']>,
+    toState: ReturnType<CubeSession['getState']>
+  ): Promise<void> => {
+    const settlement = createAnimationTransitionSettlement();
+    animationQueue.push({ move, fromState, toState, ...settlement });
+    void processAnimationQueue();
+    return settlement.promise;
+  };
+
   const processAnimationQueue = async (): Promise<void> => {
     if (processingAnimations) return;
     processingAnimations = true;
@@ -218,12 +271,22 @@ export function initializeApp(): void {
       while (animationQueue.length > 0 && generation === sessionGeneration) {
         const transition = animationQueue.shift();
         if (transition === undefined) break;
+        activeTransition = transition;
 
-        await cubeRenderer.animateMove(
-          transition.move,
-          transition.fromState,
-          transition.toState
-        );
+        try {
+          await cubeRenderer.animateMove(
+            transition.move,
+            transition.fromState,
+            transition.toState
+          );
+          transition.complete();
+        } catch (error) {
+          transition.fail(error);
+        } finally {
+          if (activeTransition === transition) {
+            activeTransition = undefined;
+          }
+        }
       }
     } finally {
       processingAnimations = false;
@@ -231,7 +294,46 @@ export function initializeApp(): void {
     }
   };
 
+  const playbackController = new SolutionPlaybackController({
+    applyMove: async (move) => {
+      const fromState = session.getState();
+      const toState = session.applyMove(move, { recordHistory: false });
+      solveController.invalidateCubeState();
+      renderUi();
+      await enqueueAnimation(move, fromState, toState);
+    },
+    onStateChange: (state) => {
+      playbackState = state;
+      playbackStatusElement.dataset.state = state;
+      playbackStatusElement.textContent = state === 'playing'
+        ? 'Playing solution…'
+        : '';
+      updateCommandButtons();
+    },
+    onComplete: () => {
+      if (session.isSolved()) {
+        playbackStatusElement.dataset.state = 'complete';
+        playbackStatusElement.textContent = 'Playback complete.';
+      } else {
+        const error = new Error('Solution playback completed without solving the cube');
+        playbackStatusElement.dataset.state = 'error';
+        playbackStatusElement.textContent = 'Playback failed.';
+        console.error('Solution playback failed', error);
+      }
+      updateCommandButtons();
+    },
+    reportError: (error) => {
+      playbackStatusElement.dataset.state = 'error';
+      playbackStatusElement.textContent = 'Playback failed.';
+      console.error('Solution playback failed', error);
+      updateCommandButtons();
+    }
+  });
+
   const applyUserMove = (move: Move): void => {
+    playbackController.cancel();
+    playbackStatusElement.textContent = '';
+    playbackStatusElement.dataset.state = 'idle';
     const now = performance.now();
     const fromState = session.getState();
 
@@ -259,8 +361,10 @@ export function initializeApp(): void {
     }
 
     renderUi(now);
-    animationQueue.push({ move, fromState, toState });
-    void processAnimationQueue();
+    void enqueueAnimation(move, fromState, toState).catch((error) => {
+      if (error instanceof AnimationTransitionCancelledError) return;
+      console.error('Cube move animation failed', error);
+    });
   };
 
   for (const move of ALL_MOVES) {
@@ -274,7 +378,10 @@ export function initializeApp(): void {
   }
 
   const applyNewScramble = (): void => {
-    animationQueue.length = 0;
+    playbackController.cancel();
+    playbackStatusElement.textContent = '';
+    playbackStatusElement.dataset.state = 'idle';
+    clearAnimationQueue();
     sessionGeneration += 1;
     cancelTimerFrame();
     timer.prepare();
@@ -291,8 +398,19 @@ export function initializeApp(): void {
     const snapshot = session.getState();
     void solveController.solve(snapshot);
   });
+  playSolutionButton.addEventListener('click', () => {
+    const solution = solveController.getCurrentSolution();
+    if (solution === undefined || solution.length === 0) return;
+
+    const playback = playbackController.play(solution);
+    solveController.invalidateCubeState();
+    void playback;
+  });
   resetButton.addEventListener('click', () => {
-    animationQueue.length = 0;
+    playbackController.cancel();
+    playbackStatusElement.textContent = '';
+    playbackStatusElement.dataset.state = 'idle';
+    clearAnimationQueue();
     sessionGeneration += 1;
     cancelTimerFrame();
     timer.reset();
