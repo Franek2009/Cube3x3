@@ -37,6 +37,13 @@ import {
 import { installKeyboardControls } from './keyboard.ts';
 import { formatCubeActions, type CubeAction } from './cubeAction.ts';
 import { installCubeDragControls } from './cubeDragControls.ts';
+import { createDefaultKeybindings, type KeybindingMap } from './keybindings.ts';
+import {
+  clearStoredKeybindings,
+  loadKeybindings,
+  saveKeybindings
+} from './keybindingStorage.ts';
+import { createKeyboardSettingsController } from './keyboardSettings.ts';
 import { SolveCommandController } from './SolveCommandController.ts';
 import {
   SolutionPlaybackController,
@@ -109,6 +116,8 @@ export function initializeApp(): void {
   const debugElement = getRequiredElement<HTMLPreElement>('debug-state');
   const controlsElement = getRequiredElement<HTMLDivElement>('move-controls');
   const rotationControlsElement = getRequiredElement<HTMLDivElement>('rotation-controls');
+  const keyboardSettingsElement = getRequiredElement<HTMLDivElement>('keyboard-controls');
+  const keyboardSettingsToggle = getRequiredElement<HTMLButtonElement>('keyboard-controls-toggle');
   const newScrambleButton = getRequiredElement<HTMLButtonElement>('new-scramble');
   const resetButton = getRequiredElement<HTMLButtonElement>('reset-cube');
   const solveButton = getRequiredElement<HTMLButtonElement>('solve-cube');
@@ -145,6 +154,9 @@ export function initializeApp(): void {
   let solverUiState: SolverUiState = 'preparing';
   let playbackState: SolutionPlaybackState = 'idle';
   let solutionOrientation = cubeOrientation;
+  let keybindings: KeybindingMap = solveStorage === undefined
+    ? createDefaultKeybindings()
+    : loadKeybindings(solveStorage);
 
   const timerStatusLabels: Readonly<Record<SolveTimerState, string>> = {
     idle: 'Idle',
@@ -572,7 +584,26 @@ export function initializeApp(): void {
     renderStatistics();
   });
 
-  const removeKeyboardControls = installKeyboardControls(applyUserAction);
+  const keyboardSettings = createKeyboardSettingsController(
+    keyboardSettingsElement,
+    keyboardSettingsToggle,
+    {
+    initialBindings: keybindings,
+    onBindingsChange: (next) => {
+      keybindings = next;
+      if (solveStorage !== undefined) saveKeybindings(solveStorage, next);
+    },
+    onResetDefaults: (defaults) => {
+      keybindings = defaults;
+      if (solveStorage !== undefined) clearStoredKeybindings(solveStorage);
+    }
+    }
+  );
+  const removeKeyboardControls = installKeyboardControls({
+    getBindings: () => keybindings,
+    isCaptureActive: keyboardSettings.isCapturing,
+    onAction: applyUserAction
+  });
   const removeCubeDragControls = installCubeDragControls(
     cubeRenderer.getInteractionElement(),
     applyUserRotation
@@ -581,6 +612,7 @@ export function initializeApp(): void {
     if (event.persisted) return;
     removeKeyboardControls();
     removeCubeDragControls();
+    keyboardSettings.dispose();
   }, { once: true });
 
   renderStatistics();

@@ -527,6 +527,86 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.keyboard-controls {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.keyboard-controls-description {
+  margin: 0.75rem 0 0;
+  color: #9ba9bd;
+  line-height: 1.5;
+}
+
+.keybinding-group h3 {
+  margin: 0 0 0.65rem;
+  color: #aab8cc;
+  font-size: 0.85rem;
+}
+
+.keybinding-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.keybinding-row {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(6.5rem, 1fr) auto auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem;
+  border: 1px solid #273449;
+  border-radius: 0.6rem;
+  background: rgba(9, 14, 21, 0.35);
+}
+
+.keybinding-action,
+.keybinding-key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.keybinding-action {
+  color: #e1e9f7;
+  font-weight: 750;
+}
+
+.keybinding-key {
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #3a475c;
+  border-radius: 0.4rem;
+  color: #dce5f5;
+  background: #111925;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keybinding-key[data-state="unassigned"] {
+  color: #718096;
+}
+
+.keybinding-button {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.76rem;
+}
+
+.keybinding-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.keybinding-status {
+  min-height: 1.4em;
+  margin: 0;
+  color: #9ba9bd;
+  font-size: 0.82rem;
+}
+
 .move-button {
   min-height: 3.25rem;
   padding: 0.7rem;
@@ -617,6 +697,10 @@ button {
 
   .move-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .keybinding-list {
+    grid-template-columns: 1fr;
   }
 }
 

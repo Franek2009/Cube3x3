@@ -1,44 +1,8 @@
-import type { Move } from '../core/moves/moves.ts';
-import type { CubeRotation } from '../core/orientation/cubeOrientation.ts';
 import type { CubeAction } from './cubeAction.ts';
+import { bindingFromKeyboardEvent, findActionForBinding, type KeybindingMap } from './keybindings.ts';
 
-const KEY_MOVES: Readonly<Record<string, Move>> = {
-  u: 'U',
-  d: 'D',
-  l: 'L',
-  r: 'R',
-  f: 'F',
-  b: 'B'
-};
-
-export function keyboardEventToMove(key: string, shiftKey: boolean): Move | undefined {
-  const baseMove = KEY_MOVES[key.toLowerCase()];
-
-  if (baseMove === undefined) {
-    return undefined;
-  }
-
-  const isUppercaseLetter = key !== key.toLowerCase() && key === key.toUpperCase();
-
-  return shiftKey || isUppercaseLetter ? `${baseMove}'` as Move : baseMove;
-}
-
-export function keyboardEventToAction(
-  key: string,
-  shiftKey: boolean
-): CubeAction | undefined {
-  const move = keyboardEventToMove(key, shiftKey);
-  if (move !== undefined) return move;
-
-  const axis = key.toLowerCase();
-  if (axis !== 'x' && axis !== 'y' && axis !== 'z') return undefined;
-
-  const isUppercaseLetter = key !== key.toLowerCase() && key === key.toUpperCase();
-  return shiftKey || isUppercaseLetter ? `${axis}'` as CubeRotation : axis;
-}
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
+export function isEditableTarget(target: EventTarget | null): boolean {
+  if (typeof HTMLElement === 'undefined' || !(target instanceof HTMLElement)) {
     return false;
   }
 
@@ -49,21 +13,31 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
-export function installKeyboardControls(onAction: (action: CubeAction) => void): () => void {
+export interface KeyboardControlsOptions {
+  readonly getBindings: () => KeybindingMap;
+  readonly isCaptureActive: () => boolean;
+  readonly onAction: (action: CubeAction) => void;
+  readonly target?: Document;
+}
+
+export function keyboardEventToAction(
+  event: Parameters<typeof bindingFromKeyboardEvent>[0],
+  bindings: KeybindingMap
+): CubeAction | undefined {
+  const binding = bindingFromKeyboardEvent(event);
+  return binding === undefined ? undefined : findActionForBinding(bindings, binding);
+}
+
+export function installKeyboardControls(options: KeyboardControlsOptions): () => void {
+  const target = options.target ?? document;
   const handleKeyDown = (event: KeyboardEvent): void => {
-    if (isEditableTarget(event.target)) {
-      return;
-    }
-
-    const action = keyboardEventToAction(event.key, event.shiftKey);
-
-    if (action !== undefined) {
-      event.preventDefault();
-      onAction(action);
-    }
+    if (options.isCaptureActive() || event.repeat || isEditableTarget(event.target)) return;
+    const action = keyboardEventToAction(event, options.getBindings());
+    if (action === undefined) return;
+    event.preventDefault();
+    options.onAction(action);
   };
 
-  document.addEventListener('keydown', handleKeyDown);
-
-  return () => document.removeEventListener('keydown', handleKeyDown);
+  target.addEventListener('keydown', handleKeyDown);
+  return () => target.removeEventListener('keydown', handleKeyDown);
 }

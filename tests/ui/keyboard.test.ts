@@ -1,89 +1,99 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { installKeyboardControls, isEditableTarget, keyboardEventToAction } from '../../src/ui/keyboard.ts';
+import { assignBinding, createDefaultKeybindings } from '../../src/ui/keybindings.ts';
 
-import {
-  keyboardEventToAction,
-  keyboardEventToMove
-} from '../../src/ui/keyboard.ts';
-
-describe('keyboardEventToMove', () => {
-  it.each([
-    ['u', 'U'],
-    ['d', 'D'],
-    ['l', 'L'],
-    ['r', 'R'],
-    ['f', 'F'],
-    ['b', 'B']
-  ] as const)('maps %s to %s', (key, move) => {
-    expect(keyboardEventToMove(key, false)).toBe(move);
-  });
-
-  it.each([
-    ['u', "U'"],
-    ['d', "D'"],
-    ['l', "L'"],
-    ['r', "R'"],
-    ['f', "F'"],
-    ['b', "B'"]
-  ] as const)('maps Shift+%s to %s', (key, move) => {
-    expect(keyboardEventToMove(key, true)).toBe(move);
-  });
-
-  it.each([
-    ['U', "U'"],
-    ['D', "D'"],
-    ['L', "L'"],
-    ['R', "R'"],
-    ['F', "F'"],
-    ['B', "B'"]
-  ] as const)('maps uppercase %s to %s', (key, move) => {
-    expect(keyboardEventToMove(key, false)).toBe(move);
-  });
-
-  it.each(['x', '1', '2', ' ', 'ArrowUp', 'Enter', 'Shift'])(
-    'ignores unsupported key %j',
-    (key) => {
-      expect(keyboardEventToMove(key, false)).toBeUndefined();
-    }
-  );
-
-  it('never maps a keyboard shortcut to a double move', () => {
-    const mappedMoves = ['u', 'd', 'l', 'r', 'f', 'b'].flatMap((key) => [
-      keyboardEventToMove(key, false),
-      keyboardEventToMove(key, true)
-    ]);
-
-    expect(mappedMoves.every((move) => move !== undefined && !move.endsWith('2'))).toBe(true);
-  });
-});
+function input(code: string, shiftKey = false, modifiers = {}) {
+  return { code, shiftKey, ctrlKey: false, altKey: false, metaKey: false, ...modifiers };
+}
 
 describe('keyboardEventToAction', () => {
   it.each([
-    ['x', false, 'x'],
-    ['y', false, 'y'],
-    ['z', false, 'z'],
-    ['x', true, "x'"],
-    ['Y', false, "y'"],
-    ['Z', true, "z'"]
-  ] as const)('maps %s with shift=%s to %s', (key, shift, action) => {
-    expect(keyboardEventToAction(key, shift)).toBe(action);
+    ['KeyU', false, 'U'], ['KeyD', false, 'D'], ['KeyL', false, 'L'],
+    ['KeyR', false, 'R'], ['KeyF', false, 'F'], ['KeyB', false, 'B'],
+    ['KeyU', true, "U'"], ['KeyR', true, "R'"],
+    ['KeyX', false, 'x'], ['KeyY', false, 'y'], ['KeyZ', false, 'z'],
+    ['KeyX', true, "x'"], ['KeyY', true, "y'"], ['KeyZ', true, "z'"]
+  ] as const)('maps %s shift=%s to %s by default', (code, shift, action) => {
+    expect(keyboardEventToAction(input(code, shift), createDefaultKeybindings())).toBe(action);
   });
 
-  it('keeps face move mappings', () => {
-    expect(keyboardEventToAction('f', false)).toBe('F');
-    expect(keyboardEventToAction('F', false)).toBe("F'");
+  it('matches exactly and supports custom double actions', () => {
+    const custom = assignBinding(createDefaultKeybindings(), 'R2', { code: 'KeyJ', shift: false });
+    expect(keyboardEventToAction(input('KeyJ'), custom)).toBe('R2');
+    expect(keyboardEventToAction(input('KeyJ', true), custom)).toBeUndefined();
   });
 
-  it.each(['1', '2', ' ', 'ArrowUp', 'Enter', 'Shift'])(
-    'ignores unsupported key %j',
-    (key) => expect(keyboardEventToAction(key, false)).toBeUndefined()
+  it.each([{ ctrlKey: true }, { altKey: true }, { metaKey: true }])(
+    'rejects unsupported modifier %#',
+    (modifier) => expect(keyboardEventToAction(input('KeyU', false, modifier), createDefaultKeybindings())).toBeUndefined()
   );
+});
 
-  it('does not expose keyboard shortcuts for double rotations', () => {
-    const actions = ['x', 'y', 'z'].flatMap((key) => [
-      keyboardEventToAction(key, false),
-      keyboardEventToAction(key, true)
-    ]);
+function keyboardEvent(code: string, options: Record<string, unknown> = {}): KeyboardEvent {
+  const event = new Event('keydown', { cancelable: true });
+  Object.assign(event, input(code), { repeat: false, ...options });
+  return event as KeyboardEvent;
+}
 
-    expect(actions.every((action) => action !== undefined && !action.endsWith('2'))).toBe(true);
+describe('installKeyboardControls', () => {
+  it('fires once, prevents only matched defaults, and ignores repeat', () => {
+    const target = new EventTarget();
+    const onAction = vi.fn();
+    installKeyboardControls({ target: target as unknown as Document, getBindings: createDefaultKeybindings, isCaptureActive: () => false, onAction });
+    const matched = keyboardEvent('KeyU');
+    const unmatched = keyboardEvent('KeyJ');
+    target.dispatchEvent(matched);
+    target.dispatchEvent(unmatched);
+    target.dispatchEvent(keyboardEvent('KeyU', { repeat: true }));
+    expect(onAction.mock.calls).toEqual([['U']]);
+    expect(matched.defaultPrevented).toBe(true);
+    expect(unmatched.defaultPrevented).toBe(false);
+  });
+
+  it('does not fire during capture and reads updated bindings dynamically', () => {
+    const target = new EventTarget();
+    const onAction = vi.fn();
+    let capturing = true;
+    let bindings = createDefaultKeybindings();
+    installKeyboardControls({ target: target as unknown as Document, getBindings: () => bindings, isCaptureActive: () => capturing, onAction });
+    target.dispatchEvent(keyboardEvent('KeyU'));
+    capturing = false;
+    bindings = assignBinding(bindings, 'U2', { code: 'KeyJ', shift: false });
+    target.dispatchEvent(keyboardEvent('KeyJ'));
+    expect(onAction.mock.calls).toEqual([['U2']]);
+  });
+
+  it('stops listening after disposal', () => {
+    const target = new EventTarget();
+    const onAction = vi.fn();
+    const dispose = installKeyboardControls({ target: target as unknown as Document, getBindings: createDefaultKeybindings, isCaptureActive: () => false, onAction });
+    dispose();
+    target.dispatchEvent(keyboardEvent('KeyU'));
+    expect(onAction).not.toHaveBeenCalled();
+  });
+});
+
+describe('editable targets', () => {
+  it('recognizes form controls and contenteditable ancestors', () => {
+    const previous = globalThis.HTMLElement;
+    class FakeHtmlElement extends EventTarget {
+      constructor(
+        readonly selectorMatch: boolean,
+        readonly isContentEditable: boolean,
+        readonly editableAncestor: boolean
+      ) { super(); }
+      matches(): boolean { return this.selectorMatch; }
+      closest(): object | null { return this.editableAncestor ? {} : null; }
+    }
+    Object.defineProperty(globalThis, 'HTMLElement', { value: FakeHtmlElement, configurable: true });
+    try {
+      expect(isEditableTarget(new FakeHtmlElement(true, false, false))).toBe(true);
+      expect(isEditableTarget(new FakeHtmlElement(false, true, false))).toBe(true);
+      expect(isEditableTarget(new FakeHtmlElement(false, false, true))).toBe(true);
+      expect(isEditableTarget(new FakeHtmlElement(false, false, false))).toBe(false);
+    } finally {
+      if (previous === undefined) delete (globalThis as { HTMLElement?: unknown }).HTMLElement;
+      else Object.defineProperty(globalThis, 'HTMLElement', { value: previous, configurable: true });
+    }
   });
 });
